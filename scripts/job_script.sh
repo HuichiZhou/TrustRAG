@@ -33,7 +33,7 @@ ADV_PER_QUERY="${ADV_PER_QUERY:-3}" # number of adversarial queries per query
 repeat_times=10
 M=10                            # number of queries
 split="test"
-top_k=5
+top_k=20
 llm_flag=true
 llm_arg=""
 if $llm_flag; then

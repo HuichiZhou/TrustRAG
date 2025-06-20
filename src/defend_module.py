@@ -632,6 +632,8 @@ def get_thresholds(model_code, dataset, score_function, percentile=95):
     Raises:
         ValueError: If configuration not found
     """
+    if model_code in ["minilm", "mpnet", "roberta"]:
+        percentile = 80
     try:
         threshold_dict = THRESHOLDS[percentile]
         model_config = threshold_dict[model_code]
@@ -747,7 +749,11 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
             )
         )
 
-    self_scores = np.vstack(self_scores)
+    if self_scores:  # Check if list is not empty
+        self_scores = np.vstack(self_scores)
+    else:
+        # Handle the empty case - return empty array or default behavior
+        self_scores = np.array([])  # or whatever makes sense for your use case
     self_truncated_start_scores = self_scores[:, 0::2]
     self_truncated_end_scores = self_scores[:, 1::2]
 

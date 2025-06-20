@@ -15,7 +15,7 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
-                "--removal_method=drift_kmeans_ngram",
+                "--removal_method=drift",
                 "--attack_method=LM_targeted", // hotflip
                 // "--attack_method=hotflip",
                 "--defend_method=none",
@@ -23,7 +23,7 @@
                 "--model_name=meta-llama/Llama-3.1-8B-Instruct",
                 // "--model_name=mistralai/Mistral-Nemo-Instruct-2407",
                 // "--eval_model_code=contriever",
-                "--eval_model_code=contriever",
+                "--eval_model_code=roberta",
                 "--M=10",
                 "--repeat_times=10",
                 "--adv_per_query=3",
