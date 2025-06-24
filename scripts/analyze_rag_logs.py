@@ -271,6 +271,8 @@ def analyze_and_visualize(df, output_dir="plots"):
             label_parts.append(f"P:{row['adv_a_position']}")
         if "adv_per_query" in row.index and pd.notna(row["adv_per_query"]):
             label_parts.append(f"APQ:{row['adv_per_query']}")
+        if "top_k" in row.index and pd.notna(row["top_k"]):
+            label_parts.append(f"TOPK:{row['top_k']}")
         return " ".join(label_parts)
 
     # Focus on 'hotflip' attack for comparison in Part 1 and Part 2

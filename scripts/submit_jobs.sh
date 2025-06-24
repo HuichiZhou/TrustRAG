@@ -30,7 +30,7 @@ for dataset in "${datasets[@]}"; do
                   # export DATASET="$dataset"
                   # export MODEL_NAME="$model_name"
                   # export EVAL_MODEL_CODE="$eval_model_name"
-                  # export ATTACK="$attack"
+                  # export ATTACK=`"$attack"
                   # export REMOVAL="$removal"
                   # export DEFENSE="$defense"
                   # export SCORE="$score"
