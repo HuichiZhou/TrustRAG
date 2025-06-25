@@ -5,7 +5,6 @@
 #SBATCH --ntasks=1                     # Number of tasks
 #SBATCH -c 8                      # number of cores (treats)
 #SBATCH --gres=gpu:L40:1
-#SBATCH -p houdini 
 #SBATCH --mail-user=tom.rahav@campus.technion.ac.il
 #SBATCH --mail-type=NONE                # Send email on all events
 
@@ -34,7 +33,7 @@ ADV_PER_QUERY="${ADV_PER_QUERY:-3}" # number of adversarial queries per query
 repeat_times=10
 M=10                            # number of queries
 split="test"
-top_k=10
+top_k=20
 llm_flag=true
 llm_arg=""
 if $llm_flag; then
