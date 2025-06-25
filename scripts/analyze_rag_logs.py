@@ -7,6 +7,8 @@ import seaborn as sns
 import argparse
 import numpy as np  # For NaN values
 
+from typing import List, Dict, Optional
+
 
 def parse_log_file(file_path):
     """
@@ -195,102 +197,241 @@ def clean_and_convert_data(df):
     return df
 
 
-def analyze_and_visualize(df, output_dir="plots"):
-    """
-    Complete analysis function with all original visualizations PLUS F1 score calculations.
-    F1 Score is calculated from:
-    - Precision = successful_removal_rate
-    - Recall = 1 - false_removal_rate
-    - F1 = 2 * (Precision * Recall) / (Precision + Recall)
-    """
-    print("\n--- Basic Statistics ---")
-    # print(df.describe().to_string())
+class ExperimentAnalyzer:
+    """Clean, modular analyzer for experiment data with F1 score calculations."""
 
-    print("\n--- Missing Values ---")
-    print(df.isnull().sum())
+    def __init__(self, df: pd.DataFrame, output_dir: str = "plots"):
+        self.df = df.copy()
+        self.output_dir = output_dir
+        self.has_retriever = "retriver" in df.columns
+        self.has_dataset = "dataset" in df.columns
 
-    # Check if retriever column exists
-    has_retriever = "retriver" in df.columns
-    if not has_retriever:
-        print(
-            "\nWarning: 'retriever' column not found. Proceeding without retriever separation."
+        # Initialize retriever values
+        if self.has_retriever:
+            self.retriever_values = sorted(df["retriver"].dropna().unique())
+            print(f"Found retriever types: {self.retriever_values}")
+        else:
+            self.retriever_values = [None]
+            print(
+                "Warning: 'retriever' column not found. Proceeding without retriever separation."
+            )
+
+        # Setup output directory
+        os.makedirs(output_dir, exist_ok=True)
+        sns.set_style("whitegrid")
+
+    def calculate_f1_scores(self) -> pd.DataFrame:
+        """Calculate F1, precision, and recall scores for the dataset."""
+
+        def calculate_metrics(row):
+            if pd.isna(row.get("success_removal_rate")) or pd.isna(
+                row.get("false_removal_rate")
+            ):
+                return np.nan, np.nan, np.nan
+
+            apq = row["adv_per_query"]
+            m = row.get("M")
+            repeat = row.get("repeat")
+            top_k = row.get("top_k")
+
+            num_origin = m * repeat * top_k
+            num_adv = m * repeat * apq
+
+            recall = row["success_removal_rate"] / 100
+            specificity = row["false_removal_rate"] / 100
+            tp = recall * num_adv
+            fp = specificity * num_origin
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+
+            if precision == 0 or recall == 0:
+                return 0, precision, recall
+
+            f1 = 2 * (precision * recall) / (precision + recall)
+            return f1, precision, recall
+
+        results = self.df.apply(calculate_metrics, axis=1)
+        metrics_df = pd.DataFrame(
+            results.tolist(),
+            columns=["f1_score", "precision", "recall"],
+            index=self.df.index,
         )
-        retriever_values = [None]
-    else:
-        retriever_values = sorted(df["retriver"].dropna().unique())
-        print(f"\nFound retriever types: {retriever_values}")
 
-    # === F1 SCORE CALCULATION ===
-    def calculate_f1_score(row):
-        """Calculate F1 score from successful_removal_rate and false_removal_rate"""
-        if pd.isna(row.get("success_removal_rate")) or pd.isna(
-            row.get("false_removal_rate")
-        ):
-            return np.nan
-        apq = row["adv_per_query"]
-        m = row.get("M")
-        repeat = row.get("repeat")
-        top_k = row.get("top_k")
+        self.df = pd.concat([self.df, metrics_df], axis=1)
+        return self.df
 
-        num_origin = m * repeat * top_k
-        num_adv = m * repeat * apq
-
-        recall = (
-            row["success_removal_rate"] / 100
-        )  # 1 - FP / (TP + FP) = TP / (TP + FN)
-        specificity = (
-            row["false_removal_rate"] / 100
-        )  # 1 - TN / (TN + FP) = FP / (TN + FP)
-        tp = recall * num_adv
-        fp = specificity * num_origin
-        precision = tp / (tp + fp)  # TP / (TP + FP)
-
-        if precision == 0 or recall == 0:
-            return 0
-
-        f1 = 2 * (precision * recall) / (precision + recall)
-        return f1
-
-    # Add F1 score column to dataframe
-    df = df.copy()
-    df["f1_score"] = df.apply(calculate_f1_score, axis=1)
-
-    print("\n=== F1 SCORE STATISTICS ===")
-    print(f"Mean F1 Score: {df['f1_score'].mean():.4f}")
-    print(f"Median F1 Score: {df['f1_score'].median():.4f}")
-    print(f"F1 Score Range: {df['f1_score'].min():.4f} - {df['f1_score'].max():.4f}")
-
-    # Define helper function for x-axis labels globally for all plotting parts
-    def create_display_label(row):
+    @staticmethod
+    def create_display_label(row: pd.Series) -> str:
+        """Create display labels for plots."""
         label_parts = []
-        if "dataset" in row.index and pd.notna(row["dataset"]):
-            label_parts.append(f"D:{row['dataset']}")
-        if "model" in row.index and pd.notna(row["model"]):
-            label_parts.append(f"M:{row['model']}")
-        if "adv_a_position" in row.index and pd.notna(row["adv_a_position"]):
-            label_parts.append(f"P:{row['adv_a_position']}")
-        if "adv_per_query" in row.index and pd.notna(row["adv_per_query"]):
-            label_parts.append(f"APQ:{row['adv_per_query']}")
-        if "top_k" in row.index and pd.notna(row["top_k"]):
-            label_parts.append(f"TOPK:{row['top_k']}")
+        mappings = [
+            ("dataset", "D"),
+            ("model", "M"),
+            ("adv_a_position", "P"),
+            ("adv_per_query", "APQ"),
+            ("top_k", "TOPK"),
+        ]
+
+        for col, prefix in mappings:
+            if col in row.index and pd.notna(row[col]):
+                label_parts.append(f"{prefix}:{row[col]}")
+
         return " ".join(label_parts)
 
-    # Focus on 'hotflip' attack for comparison in Part 1 and Part 2
-    df_hotflip = df[df["attack"] == "hotflip"].copy()
+    def get_plot_data(
+        self,
+        attack_filter: Optional[str] = None,
+        removal_filter: Optional[List[str]] = None,
+        retriever_val: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Get filtered and sorted data for plotting."""
+        data = self.df.copy()
 
-    if df_hotflip.empty:
-        print(
-            "\nNo 'hotflip' attack data found. Skipping Part 1 and Part 2 visualizations."
-        )
-    else:
-        # --- Part 1: Comparison of 'drift' vs 'kmeans_ngram' under 'hotflip' attack ---
-        print(
-            "\n--- Analyzing 'drift' vs 'kmeans_ngram' removal methods (Hotflip Attack) ---"
+        # Apply filters
+        if attack_filter:
+            data = data[data["attack"] == attack_filter]
+        if removal_filter:
+            data = data[data["removal"].isin(removal_filter)]
+        if self.has_retriever and retriever_val:
+            data = data[data["retriver"] == retriever_val]
+
+        # Sort data
+        sort_keys = ["adv_per_query", "score", "dataset", "model", "adv_a_position"]
+        if self.has_retriever:
+            sort_keys.append("retriver")
+
+        existing_keys = [key for key in sort_keys if key in data.columns]
+        if existing_keys:
+            data = data.sort_values(by=existing_keys)
+
+        # Add display labels
+        data["plot_specific_display_group"] = data.apply(
+            self.create_display_label, axis=1
         )
 
+        return data
+
+    def create_plot(
+        self,
+        data: pd.DataFrame,
+        metric: str,
+        score_func: str,
+        plot_type: str,
+        retriever_val: Optional[str] = None,
+        comparison_mode: bool = False,
+    ) -> str:
+        """Create a single plot with consistent styling."""
+        if data.empty or metric not in data.columns or data[metric].dropna().empty:
+            return None
+
+        plt.figure(figsize=(15, 7))
+
+        # Determine colors and styling
+        is_f1_score = metric == "f1_score"
+        retriever_title = f" - Retriever: {retriever_val}" if retriever_val else ""
+        title_metric = metric.replace("_", " ").title()
+
+        if comparison_mode and "removal" in data.columns:
+            # Comparison plot with hue
+            palette = self._get_comparison_palette(
+                data["removal"].unique(), is_f1_score
+            )
+            sns.barplot(
+                x="plot_specific_display_group",
+                y=metric,
+                hue="removal",
+                data=data,
+                palette=palette,
+            )
+            plt.legend(title="Removal Method")
+        else:
+            # Single method plot
+            color = self._get_single_color(plot_type, is_f1_score)
+            sns.barplot(
+                x="plot_specific_display_group", y=metric, data=data, color=color
+            )
+
+        # Set title and labels
+        plt.title(
+            f"{title_metric} ({plot_type}){retriever_title}\n"
+            f"Score Func: {score_func} (AdvPerQuery sorted: 1s, 3s, 5s)"
+        )
+        plt.xlabel("Experiment Group (D:Dataset M:Model P:AdvPos APQ:AdvPerQuery)")
+        plt.ylabel(title_metric)
+        plt.xticks(rotation=75, ha="right", fontsize=8)
+
+        # Add value annotations for F1 scores
+        if is_f1_score:
+            for container in plt.gca().containers:
+                plt.gca().bar_label(container, fmt="%.3f", fontsize=8)
+
+        plt.tight_layout()
+
+        # Generate filename
+        suffix = f"_retriever_{retriever_val}" if retriever_val else ""
+        filename = os.path.join(
+            self.output_dir, f"{plot_type}_{metric}_score_{score_func}{suffix}.png"
+        )
+
+        try:
+            plt.savefig(filename)
+            print(f"Saved plot to {filename}")
+            return filename
+        except Exception as e:
+            print(f"Error saving plot {filename}: {e}")
+            return None
+        finally:
+            plt.close()
+
+    def _get_comparison_palette(
+        self, removal_methods: List[str], is_f1_score: bool
+    ) -> Dict:
+        """Get color palette for comparison plots."""
+        if is_f1_score:
+            base_colors = {"drift": "darkblue", "kmeans_ngram": "darkred"}
+        else:
+            base_colors = {"drift": "skyblue", "kmeans_ngram": "salmon"}
+
+        # Extend with additional colors if needed
+        all_colors = list(base_colors.values())
+        if len(removal_methods) > len(base_colors):
+            extra_colors = sns.color_palette(
+                "Set2", n_colors=len(removal_methods) - len(base_colors)
+            )
+            all_colors.extend(extra_colors)
+
+        return dict(zip(removal_methods, all_colors))
+
+    def _get_single_color(self, plot_type: str, is_f1_score: bool) -> str:
+        """Get single color for non-comparison plots."""
+        color_map = {
+            ("Hotflip Attack", True): "darkgray",
+            ("Hotflip Attack", False): "gray",
+            ("No Attack", True): "darkseagreen",
+            ("No Attack", False): "mediumseagreen",
+        }
+        return color_map.get((plot_type, is_f1_score), "steelblue")
+
+    def analyze_comparison(
+        self,
+        attack: str = "hotflip",
+        removal_methods: List[str] = ["drift", "kmeans_ngram"],
+    ):
+        """Analyze comparison between removal methods."""
+        print(
+            f"\n--- Analyzing {' vs '.join(removal_methods)} removal methods ({attack.title()} Attack) ---"
+        )
+
+        comparison_data = self.get_plot_data(
+            attack_filter=attack, removal_filter=removal_methods
+        )
+
+        if comparison_data.empty:
+            print(f"No data found for {attack} attack with {removal_methods} methods.")
+            return
+
+        # Find complete experimental pairs
         comparison_keys = [
             "dataset",
-            "retriver",
             "model",
             "score",
             "adv_a_position",
@@ -300,686 +441,227 @@ def analyze_and_visualize(df, output_dir="plots"):
             "no_questions",
             "both_sides",
         ]
-        if has_retriever:
-            comparison_keys.append("retriever")
+        if self.has_retriever:
+            comparison_keys.append("retriver")
 
-        df_filtered_removal_comparison = df_hotflip[
-            df_hotflip["removal"].isin(["drift", "kmeans_ngram"])
-        ].copy()
+        existing_keys = [
+            key for key in comparison_keys if key in comparison_data.columns
+        ]
+        comparison_data["experiment_setup_id"] = (
+            comparison_data[existing_keys]
+            .astype(str)
+            .fillna("NA")
+            .agg("_".join, axis=1)
+        )
 
-        if df_filtered_removal_comparison.empty:
-            print(
-                "\nNo 'drift' or 'kmeans_ngram' removal data for 'hotflip' attack found for comparison plots."
-            )
-        else:
-            existing_comparison_keys_comp = [
-                key
-                for key in comparison_keys
-                if key in df_filtered_removal_comparison.columns
-            ]
-            if not all(
-                key in existing_comparison_keys_comp
-                for key in ["score", "adv_per_query"]
-            ):
-                print(
-                    "\nCritical error for comparison plots: 'score' or 'adv_per_query' columns are missing."
-                )
+        setup_counts = comparison_data.groupby("experiment_setup_id")[
+            "removal"
+        ].nunique()
+        complete_setups = setup_counts[setup_counts == len(removal_methods)].index
+        comparable_data = comparison_data[
+            comparison_data["experiment_setup_id"].isin(complete_setups)
+        ]
+
+        if comparable_data.empty:
+            print(f"No complete pairs found for comparison.")
+            return
+
+        # Print summary
+        metrics = [
+            "success_injection_rate",
+            "correct_answer_pct",
+            "false_removal_rate",
+            "success_removal_rate",
+            "inference_time",
+            "f1_score",
+        ]
+        existing_metrics = [m for m in metrics if m in comparable_data.columns]
+
+        summary = (
+            comparable_data.groupby(existing_keys + ["removal"])[existing_metrics]
+            .mean()
+            .unstack(level="removal")
+        )
+        print(
+            f"\n--- Comparison Summary: {' vs '.join(removal_methods)} ({attack.title()} Attack) ---"
+        )
+        print(summary.to_string())
+
+        # Generate plots
+        self._generate_plots_for_data(
+            comparable_data,
+            existing_metrics,
+            "comparison",
+            comparison_mode=True,
+        )
+
+    def analyze_single_method(self, attack: str, removal: str):
+        """Analyze a single removal method under specific attack."""
+        print(
+            f"\n--- Analyzing '{removal}' removal method ({attack.title()} Attack) ---"
+        )
+
+        data = self.get_plot_data(attack_filter=attack, removal_filter=[removal])
+
+        if data.empty:
+            print(f"No data found for {attack} attack with {removal} method.")
+            return
+
+        metrics = [
+            "success_injection_rate",
+            "correct_answer_pct",
+            "inference_time",
+            "f1_score",
+        ]
+        existing_metrics = [m for m in metrics if m in data.columns]
+
+        self._generate_plots_for_data(
+            data, existing_metrics, f"{attack}_{removal}_removal", comparison_mode=False
+        )
+
+    def analyze_no_attack(self):
+        """Analyze scenarios with no attack."""
+        print("\n--- Analyzing 'none' attack scenarios (No Attack Baseline) ---")
+
+        data = self.get_plot_data(attack_filter="none")
+
+        if data.empty:
+            print("No data found for 'none' attack scenarios.")
+            return
+
+        metrics = [
+            "correct_answer_pct",
+            "false_removal_rate",
+            "inference_time",
+            "success_injection_rate",
+            "f1_score",
+        ]
+        existing_metrics = [m for m in metrics if m in data.columns]
+
+        self._generate_plots_for_data(
+            data,
+            existing_metrics,
+            "no_attack",
+            comparison_mode=data["removal"].nunique() > 1,
+        )
+
+    def _generate_plots_for_data(
+        self,
+        data: pd.DataFrame,
+        metrics: List[str],
+        plot_type: str,
+        comparison_mode: bool = False,
+    ):
+        """Generate plots for given data and metrics."""
+        score_functions = ["dot", "cos"]
+
+        for retriever_val in self.retriever_values:
+            # Filter by retriever if applicable
+            if self.has_retriever and retriever_val:
+                retriever_data = data[data["retriver"] == retriever_val]
             else:
-                df_filtered_removal_comparison["experiment_setup_id"] = (
-                    df_filtered_removal_comparison[existing_comparison_keys_comp]
-                    .astype(str)
-                    .fillna("NA")
-                    .agg("_".join, axis=1)
-                )
-                setup_counts = df_filtered_removal_comparison.groupby(
-                    "experiment_setup_id"
-                )["removal"].nunique()
-                complete_setups = setup_counts[setup_counts == 2].index
-                df_comparable = df_filtered_removal_comparison[
-                    df_filtered_removal_comparison["experiment_setup_id"].isin(
-                        complete_setups
-                    )
-                ].copy()
+                retriever_data = data
 
-                if df_comparable.empty:
-                    print(
-                        "\nNo complete pairs of 'drift' and 'kmeans_ngram' experiments found for comparison."
-                    )
-                else:
-                    print(
-                        "\n--- Comparison Summary: Drift vs. Kmeans_Ngram (Hotflip Attack) ---"
-                    )
-                    # === UPDATED TO INCLUDE F1 SCORE ===
-                    comparison_metrics = [
-                        "success_injection_rate",
-                        "correct_answer_pct",
-                        "false_removal_rate",
-                        "success_removal_rate",
-                        "inference_time",
-                        "f1_score",  # ADDED F1 SCORE
-                    ]
-                    final_comparison_keys_comp = [
-                        key for key in comparison_keys if key in df_comparable.columns
-                    ]
-                    comparison_summary = (
-                        df_comparable.groupby(final_comparison_keys_comp + ["removal"])[
-                            comparison_metrics
-                        ]
-                        .mean()
-                        .dropna(how="all")
-                        .unstack(level="removal")
-                    )
-                    print(comparison_summary.to_string())
+            if retriever_data.empty:
+                continue
 
-                    print(
-                        "\n--- Generating Visualizations for 'drift' vs 'kmeans_ngram' (Hotflip Attack) ---"
-                    )
-                    os.makedirs(output_dir, exist_ok=True)
-                    sns.set_style("whitegrid")
-                    if (
-                        "score" not in df_comparable.columns
-                        or "adv_per_query" not in df_comparable.columns
-                    ):
-                        print(
-                            "Error: 'score' or 'adv_per_query' missing in df_comparable for comparison plots."
+            for metric in metrics:
+                for score_func in score_functions:
+                    plot_data = retriever_data[retriever_data["score"] == score_func]
+                    if not plot_data.empty:
+                        self.create_plot(
+                            plot_data,
+                            metric,
+                            score_func,
+                            plot_type,
+                            retriever_val,
+                            comparison_mode,
                         )
-                    else:
-                        score_function_values_to_iterate = ["dot", "cos"]
-                        sort_keys_comp = [
-                            "adv_per_query",
-                            "score",
-                            "dataset",
-                            "model",
-                            "adv_a_position",
-                        ]
-                        if has_retriever:
-                            sort_keys_comp.append("retriever")
 
-                        existing_sort_keys_comp = [
-                            key
-                            for key in sort_keys_comp
-                            if key in df_comparable.columns
-                        ]
-                        if (
-                            not existing_sort_keys_comp
-                            or "adv_per_query" not in existing_sort_keys_comp
-                        ):
-                            print(
-                                "Error: Necessary sort keys missing for df_comparable."
-                            )
-                        else:
-                            df_comparable_sorted = df_comparable.sort_values(
-                                by=existing_sort_keys_comp
-                            )
+    def analyze_f1_scores(self):
+        """Comprehensive F1 score analysis."""
+        if "f1_score" not in self.df.columns or self.df["f1_score"].dropna().empty:
+            print("No F1 score data available for analysis.")
+            return
 
-                            # Iterate through retrievers
-                            for retriever_val in retriever_values:
-                                if has_retriever and retriever_val is not None:
-                                    df_retriever_subset = df_comparable_sorted[
-                                        df_comparable_sorted["retriver"]
-                                        == retriever_val
-                                    ].copy()
-                                    retriever_suffix = f"_retriever_{retriever_val}"
-                                    retriever_title = f" - Retriever: {retriever_val}"
-                                else:
-                                    df_retriever_subset = df_comparable_sorted.copy()
-                                    retriever_suffix = ""
-                                    retriever_title = ""
+        print("\n=== F1 SCORE DEEP DIVE ANALYSIS ===")
 
-                                if df_retriever_subset.empty:
-                                    continue
-
-                                for metric in comparison_metrics:
-                                    if (
-                                        metric not in df_retriever_subset.columns
-                                        or df_retriever_subset[metric].dropna().empty
-                                    ):
-                                        print(
-                                            f"Skipping comparison plot for '{metric}'{retriever_title}: missing or all NaN."
-                                        )
-                                        continue
-                                    for sf_value in score_function_values_to_iterate:
-                                        df_plot_data_comp = df_retriever_subset[
-                                            df_retriever_subset["score"] == sf_value
-                                        ].copy()
-                                        if df_plot_data_comp.empty:
-                                            continue
-                                        plt.figure(figsize=(15, 7))
-                                        df_plot_data_comp[
-                                            "plot_specific_display_group"
-                                        ] = df_plot_data_comp.apply(
-                                            create_display_label, axis=1
-                                        )
-
-                                        # === SPECIAL STYLING FOR F1 SCORE ===
-                                        if metric == "f1_score":
-                                            palette = {
-                                                "drift": "darkblue",
-                                                "kmeans_ngram": "darkred",
-                                            }
-                                        else:
-                                            palette = {
-                                                "drift": "skyblue",
-                                                "kmeans_ngram": "salmon",
-                                            }
-
-                                        sns.barplot(
-                                            x="plot_specific_display_group",
-                                            y=metric,
-                                            hue="removal",
-                                            data=df_plot_data_comp,
-                                            palette=palette,
-                                        )
-                                        title_metric_name = metric.replace(
-                                            "_", " "
-                                        ).title()
-                                        plt.title(
-                                            f"{title_metric_name} (Hotflip Attack) Comparison{retriever_title}\nScore Func: {sf_value} (AdvPerQuery sorted: 1s, 3s, 5s)"
-                                        )
-                                        plt.xlabel(
-                                            "Experiment Group (D:Dataset M:Model P:AdvPos APQ:AdvPerQuery)"
-                                        )
-                                        plt.ylabel(title_metric_name)
-                                        plt.xticks(rotation=75, ha="right", fontsize=8)
-                                        plt.legend(title="Removal Method")
-
-                                        # === ADD VALUE ANNOTATIONS FOR F1 SCORE ===
-                                        if metric == "f1_score":
-                                            for container in plt.gca().containers:
-                                                plt.gca().bar_label(
-                                                    container, fmt="%.3f", fontsize=8
-                                                )
-
-                                        plt.tight_layout()
-                                        plot_filename = os.path.join(
-                                            output_dir,
-                                            f"comparison_{metric}_score_{sf_value}{retriever_suffix}.png",
-                                        )
-                                        try:
-                                            plt.savefig(plot_filename)
-                                            print(f"Saved plot to {plot_filename}")
-                                        except Exception as e:
-                                            print(
-                                                f"Error saving plot {plot_filename}: {e}"
-                                            )
-                                        plt.close()
-
-        # --- Part 2: Analysis of 'all' removal method (no context/baseline) under 'hotflip' attack ---
-        print("\n--- Analyzing 'all' removal method (Hotflip Attack) ---")
-        df_all_removal_hotflip = df[df["removal"] == "all"].copy()
-
-        if df_all_removal_hotflip.empty:
-            print(
-                "\nNo data found for 'all' removal method under 'hotflip' attack. Skipping these plots."
-            )
-        else:
-            if (
-                "score" not in df_all_removal_hotflip.columns
-                or "adv_per_query" not in df_all_removal_hotflip.columns
-            ):
-                print(
-                    "Error: 'score' or 'adv_per_query' missing in df_all_removal_hotflip. Skipping 'all' removal plots for hotflip attack."
-                )
-            else:
-                # === UPDATED TO INCLUDE F1 SCORE ===
-                metrics_for_all_plots = [
-                    "success_injection_rate",
-                    "correct_answer_pct",
-                    "inference_time",
-                    "f1_score",  # ADDED F1 SCORE
-                ]
-                metrics_for_all_plots = [
-                    m
-                    for m in metrics_for_all_plots
-                    if m in df_all_removal_hotflip.columns
-                ]
-                print(
-                    "\n--- Generating Visualizations for 'all' removal method (Hotflip Attack) ---"
-                )
-                os.makedirs(output_dir, exist_ok=True)
-                sns.set_style("whitegrid")
-                score_function_values_to_iterate = ["dot", "cos"]
-                sort_keys_all_hotflip = [
-                    "adv_per_query",
-                    "score",
-                    "dataset",
-                    "model",
-                    "adv_a_position",
-                ]
-                if has_retriever:
-                    sort_keys_all_hotflip.append("retriever")
-
-                existing_sort_keys_all_hotflip = [
-                    key
-                    for key in sort_keys_all_hotflip
-                    if key in df_all_removal_hotflip.columns
-                ]
-                if (
-                    not existing_sort_keys_all_hotflip
-                    or "adv_per_query" not in existing_sort_keys_all_hotflip
-                ):
-                    print(
-                        "Error: Necessary sort keys missing for df_all_removal_hotflip."
-                    )
-                else:
-                    df_all_removal_hotflip_sorted = df_all_removal_hotflip.sort_values(
-                        by=existing_sort_keys_all_hotflip
-                    )
-
-                    # Iterate through retrievers
-                    for retriever_val in retriever_values:
-                        if has_retriever and retriever_val is not None:
-                            df_retriever_subset = df_all_removal_hotflip_sorted[
-                                df_all_removal_hotflip_sorted["retriver"]
-                                == retriever_val
-                            ].copy()
-                            retriever_suffix = f"_retriever_{retriever_val}"
-                            retriever_title = f" - Retriever: {retriever_val}"
-                        else:
-                            df_retriever_subset = df_all_removal_hotflip_sorted.copy()
-                            retriever_suffix = ""
-                            retriever_title = ""
-
-                        if df_retriever_subset.empty:
-                            continue
-
-                        for metric in metrics_for_all_plots:
-                            if (
-                                metric not in df_retriever_subset.columns
-                                or df_retriever_subset[metric].dropna().empty
-                            ):
-                                print(
-                                    f"Skipping 'all' removal (hotflip) plot for '{metric}'{retriever_title}: missing or all NaN."
-                                )
-                                continue
-                            for sf_value in score_function_values_to_iterate:
-                                df_plot_data_all_hf = df_retriever_subset[
-                                    df_retriever_subset["score"] == sf_value
-                                ].copy()
-                                if df_plot_data_all_hf.empty:
-                                    continue
-                                plt.figure(figsize=(15, 7))
-                                df_plot_data_all_hf["plot_specific_display_group"] = (
-                                    df_plot_data_all_hf.apply(
-                                        create_display_label, axis=1
-                                    )
-                                )
-
-                                # === SPECIAL COLOR FOR F1 SCORE ===
-                                color = "darkgray" if metric == "f1_score" else "gray"
-
-                                sns.barplot(
-                                    x="plot_specific_display_group",
-                                    y=metric,
-                                    data=df_plot_data_all_hf,
-                                    color=color,
-                                )
-                                title_metric_name = metric.replace("_", " ").title()
-                                plt.title(
-                                    f"{title_metric_name} (Hotflip Attack) - Removal: All{retriever_title}\nScore Func: {sf_value} (AdvPerQuery sorted: 1s, 3s, 5s)"
-                                )
-                                plt.xlabel(
-                                    "Experiment Group (D:Dataset M:Model P:AdvPos APQ:AdvPerQuery)"
-                                )
-                                plt.ylabel(title_metric_name)
-                                plt.xticks(rotation=75, ha="right", fontsize=8)
-
-                                # === ADD VALUE ANNOTATIONS FOR F1 SCORE ===
-                                if metric == "f1_score":
-                                    for container in plt.gca().containers:
-                                        plt.gca().bar_label(
-                                            container, fmt="%.3f", fontsize=8
-                                        )
-
-                                plt.tight_layout()
-                                plot_filename = os.path.join(
-                                    output_dir,
-                                    f"hotflip_all_removal_{metric}_score_{sf_value}{retriever_suffix}.png",
-                                )
-                                try:
-                                    plt.savefig(plot_filename)
-                                    print(f"Saved plot to {plot_filename}")
-                                except Exception as e:
-                                    print(f"Error saving plot {plot_filename}: {e}")
-                                plt.close()
-
-    # --- Part 3: Analysis of 'none' attack scenarios ---
-    print("\n--- Analyzing 'none' attack scenarios (No Attack Baseline) ---")
-    # Use the original df, not df_hotflip
-    df_no_attack = df[df["attack"] == "none"].copy()
-
-    if df_no_attack.empty:
-        print("\nNo data found for 'none' attack scenarios. Skipping these plots.")
-    else:
-        if (
-            "score" not in df_no_attack.columns
-            or "adv_per_query" not in df_no_attack.columns
-        ):
-            print(
-                "Error: 'score' or 'adv_per_query' missing in df_no_attack. Skipping 'none' attack plots."
-            )
-        else:
-            # === UPDATED TO INCLUDE F1 SCORE ===
-            metrics_for_no_attack_plots = [
-                "correct_answer_pct",
-                "false_removal_rate",
-                "inference_time",
-                "success_injection_rate",
-                "f1_score",  # ADDED F1 SCORE
-            ]
-            metrics_for_no_attack_plots = [
-                m for m in metrics_for_no_attack_plots if m in df_no_attack.columns
-            ]
-
-            print("\n--- Generating Visualizations for 'none' attack scenarios ---")
-            os.makedirs(output_dir, exist_ok=True)
-            sns.set_style("whitegrid")
-            score_function_values_to_iterate = ["dot", "cos"]
-            sort_keys_no_attack = [
-                "adv_per_query",
-                "score",
-                "dataset",
-                "model",
-                "adv_a_position",
-                "removal",
-            ]
-            if has_retriever:
-                sort_keys_no_attack.append("retriever")
-
-            existing_sort_keys_no_attack = [
-                key for key in sort_keys_no_attack if key in df_no_attack.columns
-            ]
-
-            if (
-                not existing_sort_keys_no_attack
-                or "adv_per_query" not in existing_sort_keys_no_attack
-            ):
-                print(
-                    "Error: Necessary sort keys missing for df_no_attack. Skipping 'none' attack plots."
-                )
-            else:
-                df_no_attack_sorted = df_no_attack.sort_values(
-                    by=existing_sort_keys_no_attack
-                )
-
-                # Iterate through retrievers
-                for retriever_val in retriever_values:
-                    if has_retriever and retriever_val is not None:
-                        df_retriever_subset = df_no_attack_sorted[
-                            df_no_attack_sorted["retriver"] == retriever_val
-                        ].copy()
-                        retriever_suffix = f"_retriever_{retriever_val}"
-                        retriever_title = f" - Retriever: {retriever_val}"
-                    else:
-                        df_retriever_subset = df_no_attack_sorted.copy()
-                        retriever_suffix = ""
-                        retriever_title = ""
-
-                    if df_retriever_subset.empty:
-                        continue
-
-                    for metric in metrics_for_no_attack_plots:
-                        if (
-                            metric not in df_retriever_subset.columns
-                            or df_retriever_subset[metric].dropna().empty
-                        ):
-                            print(
-                                f"Skipping 'none' attack plot for '{metric}'{retriever_title}: missing or all NaN."
-                            )
-                            continue
-                        for sf_value in score_function_values_to_iterate:
-                            df_plot_data_no_attack = df_retriever_subset[
-                                df_retriever_subset["score"] == sf_value
-                            ].copy()
-                            if df_plot_data_no_attack.empty:
-                                continue
-
-                            plt.figure(figsize=(15, 7))
-                            df_plot_data_no_attack["plot_specific_display_group"] = (
-                                df_plot_data_no_attack.apply(
-                                    create_display_label, axis=1
-                                )
-                            )
-
-                            num_removal_methods = df_plot_data_no_attack[
-                                "removal"
-                            ].nunique()
-                            title_metric_name = metric.replace("_", " ").title()
-
-                            if num_removal_methods > 1:
-                                # Dynamically create a palette if multiple removal methods are present
-                                unique_removals = df_plot_data_no_attack[
-                                    "removal"
-                                ].unique()
-
-                                # === SPECIAL PALETTE FOR F1 SCORE ===
-                                if metric == "f1_score":
-                                    palette_no_attack = sns.color_palette(
-                                        "plasma", n_colors=len(unique_removals)
-                                    )
-                                else:
-                                    palette_no_attack = sns.color_palette(
-                                        "viridis", n_colors=len(unique_removals)
-                                    )
-                                removal_palette_map = dict(
-                                    zip(unique_removals, palette_no_attack)
-                                )
-
-                                sns.barplot(
-                                    x="plot_specific_display_group",
-                                    y=metric,
-                                    hue="removal",
-                                    data=df_plot_data_no_attack,
-                                    palette=removal_palette_map,
-                                )
-                                plt.legend(title="Removal Method")
-                                plt.title(
-                                    f"{title_metric_name} (No Attack){retriever_title}\nScore Func: {sf_value} (AdvPerQuery sorted: 1s, 3s, 5s)"
-                                )
-                            else:
-                                # If only one removal method
-                                single_removal_method_name = (
-                                    df_plot_data_no_attack["removal"].iloc[0]
-                                    if not df_plot_data_no_attack.empty
-                                    else "Unknown"
-                                )
-
-                                # === SPECIAL COLOR FOR F1 SCORE ===
-                                color = (
-                                    "darkseagreen"
-                                    if metric == "f1_score"
-                                    else "mediumseagreen"
-                                )
-
-                                sns.barplot(
-                                    x="plot_specific_display_group",
-                                    y=metric,
-                                    data=df_plot_data_no_attack,
-                                    color=color,
-                                )
-                                plt.title(
-                                    f"{title_metric_name} (No Attack) - Removal: {single_removal_method_name}{retriever_title}\nScore Func: {sf_value} (AdvPerQuery sorted: 1s, 3s, 5s)"
-                                )
-
-                            plt.xlabel(
-                                "Experiment Group (D:Dataset M:Model P:AdvPos APQ:AdvPerQuery)"
-                            )
-                            plt.ylabel(title_metric_name)
-                            plt.xticks(rotation=75, ha="right", fontsize=8)
-
-                            # === ADD VALUE ANNOTATIONS FOR F1 SCORE ===
-                            if metric == "f1_score":
-                                for container in plt.gca().containers:
-                                    plt.gca().bar_label(
-                                        container, fmt="%.3f", fontsize=8
-                                    )
-
-                            plt.tight_layout()
-                            plot_filename = os.path.join(
-                                output_dir,
-                                f"no_attack_{metric}_score_{sf_value}{retriever_suffix}.png",
-                            )
-                            try:
-                                plt.savefig(plot_filename)
-                                print(f"Saved plot to {plot_filename}")
-                            except Exception as e:
-                                print(f"Error saving plot {plot_filename}: {e}")
-                            plt.close()
-
-    # === ENHANCED F1 SCORE ANALYSIS WITH DATASET DIFFERENTIATION ===
-    print("\n=== F1 SCORE DEEP DIVE ANALYSIS ===")
-
-    if "f1_score" in df.columns and not df["f1_score"].dropna().empty:
-        # Check if dataset column exists
-        has_dataset = "dataset" in df.columns
-
-        # Group by key experimental factors including dataset
+        # Group by key experimental factors
         groupby_cols = ["attack", "removal", "score"]
-        if has_retriever:
+        if self.has_retriever:
             groupby_cols.append("retriver")
-        if has_dataset:
-            groupby_cols.insert(0, "dataset")  # Add dataset as first grouping column
+        if self.has_dataset:
+            groupby_cols.insert(0, "dataset")
 
         f1_summary = (
-            df.groupby(groupby_cols)["f1_score"]
+            self.df.groupby(groupby_cols)["f1_score"]
             .agg(["count", "mean", "std", "min", "max"])
             .round(4)
         )
 
-        if has_dataset:
-            print(
-                "\nF1 Score Summary by Dataset, Attack, Removal Method, and Score Function:"
-            )
-        else:
-            print("\nF1 Score Summary by Attack, Removal Method, and Score Function:")
+        print("\nF1 Score Summary:")
         print(f1_summary.to_string())
 
-        # Dataset-specific analysis if dataset column exists
-        if has_dataset:
-            print("\n=== DATASET-SPECIFIC F1 SCORE ANALYSIS ===")
+        if self.has_dataset:
+            self._analyze_dataset_specific_f1()
 
-            # Overall performance by dataset
-            dataset_summary = (
-                df.groupby("dataset")["f1_score"]
-                .agg(["count", "mean", "std", "min", "max"])
-                .round(4)
-            )
-            print("\nOverall F1 Score Performance by Dataset:")
-            print(dataset_summary.to_string())
+    def _analyze_dataset_specific_f1(self):
+        """Dataset-specific F1 score analysis."""
+        print("\n=== DATASET-SPECIFIC F1 SCORE ANALYSIS ===")
 
-            # Best performing configurations per dataset
-            print("\nBest F1 Score Configuration per Dataset:")
-            best_configs = df.loc[df.groupby("dataset")["f1_score"].idxmax()]
-            display_cols = ["dataset", "attack", "removal", "score", "f1_score"]
-            if has_retriever:
-                display_cols.insert(-1, "retriver")
-            print(best_configs[display_cols].to_string(index=False))
+        # Overall performance by dataset
+        dataset_summary = (
+            self.df.groupby("dataset")["f1_score"]
+            .agg(["count", "mean", "std", "min", "max"])
+            .round(4)
+        )
+        print("\nOverall F1 Score Performance by Dataset:")
+        print(dataset_summary.to_string())
 
-            # Cross-dataset comparison for each attack type
-            print("\nF1 Score Comparison Across Datasets by Attack Type:")
-            attack_dataset_comparison = df.pivot_table(
-                values="f1_score", index="attack", columns="dataset", aggfunc="mean"
-            ).round(4)
-            print(attack_dataset_comparison.to_string())
+        # Best performing configurations per dataset
+        print("\nBest F1 Score Configuration per Dataset:")
+        best_configs = self.df.loc[self.df.groupby("dataset")["f1_score"].idxmax()]
+        display_cols = ["dataset", "attack", "removal", "score", "f1_score"]
+        if self.has_retriever:
+            display_cols.insert(-1, "retriver")
+        print(best_configs[display_cols].to_string(index=False))
 
-        # Create visualizations
-        if has_dataset:
-            # Get unique score types
-            score_types = df["score"].unique()
-            print(f"Found score types: {score_types}")
-            print(f"Data shape: {df.shape}")
-            print(f"F1 score column info: {df['f1_score'].describe()}")
+        # Cross-dataset comparison
+        print("\nF1 Score Comparison Across Datasets by Attack Type:")
+        attack_dataset_comparison = self.df.pivot_table(
+            values="f1_score", index="attack", columns="dataset", aggfunc="mean"
+        ).round(4)
+        print(attack_dataset_comparison.to_string())
 
-            # Create separate heatmaps for each score type
-            for score_type in score_types:
-                print(f"\nProcessing {score_type} score type...")
-                score_data = df[df["score"] == score_type]
-                print(f"Score data shape: {score_data.shape}")
-                print(f"Score data F1 scores: {score_data['f1_score'].describe()}")
-                print(
-                    f"Unique datasets: {score_data['dataset'].unique() if 'dataset' in score_data.columns else 'No dataset column'}"
-                )
-                print(
-                    f"Unique attacks: {score_data['attack'].unique() if 'attack' in score_data.columns else 'No attack column'}"
-                )
-                print(
-                    f"Unique removals: {score_data['removal'].unique() if 'removal' in score_data.columns else 'No removal column'}"
-                )
+    def run_complete_analysis(self):
+        """Run the complete analysis pipeline."""
+        print("\n--- Starting Complete Analysis ---")
 
-                # Skip if no data for this score type
-                if score_data.empty or score_data["f1_score"].dropna().empty:
-                    print(
-                        f"No F1 score data available for {score_type} score type, skipping heatmaps"
-                    )
-                    continue
+        # Calculate F1 scores
+        self.calculate_f1_scores()
 
-                # Check required columns exist
-                required_cols = ["dataset", "attack", "removal", "f1_score"]
-                missing_cols = [
-                    col for col in required_cols if col not in score_data.columns
-                ]
-                if missing_cols:
-                    print(
-                        f"Missing required columns for {score_type}: {missing_cols}, skipping"
-                    )
-                    continue
+        # Run different analysis sections
+        self.analyze_comparison(
+            attack="hotflip", removal_methods=["drift", "kmeans_ngram"]
+        )
+        self.analyze_single_method(attack="hotflip", removal="all")
+        self.analyze_no_attack()
+        self.analyze_f1_scores()
 
-                print(
-                    f"Successfully validated data for {score_type} - would create visualizations here"
-                )
-                # Heatmaps temporarily disabled for debugging
+        print("\n--- Finished Generating All Visualizations with F1 Score ---")
 
-            # Create separate box plots for each score type
-            for score_type in score_types:
-                score_data = df[df["score"] == score_type]
 
-                # Skip if no data for this score type
-                if score_data.empty or score_data["f1_score"].dropna().empty:
-                    print(
-                        f"No F1 score data available for {score_type} score type, skipping boxplots"
-                    )
-                    continue
+def analyze_and_visualize(df: pd.DataFrame, output_dir: str = "plots"):
+    """
+    Main function to analyze and visualize experiment data.
 
-                print(
-                    f"Would create boxplots for {score_type} score type ({len(score_data)} data points)"
-                )
-                # Boxplots temporarily disabled for debugging
-
-        else:
-            # Original single heatmap if no dataset column
-            plt.figure(figsize=(12, 8))
-
-            pivot_data = df.pivot_table(
-                values="f1_score",
-                index=["attack", "removal"],
-                columns="score",
-                aggfunc="mean",
-            )
-
-            sns.heatmap(
-                pivot_data,
-                annot=True,
-                fmt=".3f",
-                cmap="RdYlBu_r",
-                cbar_kws={"label": "F1 Score"},
-            )
-            plt.title(
-                "F1 Score Heatmap by Attack Type, Removal Method, and Score Function"
-            )
-            plt.tight_layout()
-
-            heatmap_filename = os.path.join(output_dir, "f1_score_heatmap.png")
-            try:
-                plt.savefig(heatmap_filename)
-                print(f"Saved F1 heatmap to {heatmap_filename}")
-            except Exception as e:
-                print(f"Error saving F1 heatmap {heatmap_filename}: {e}")
-            plt.close()
-
-    else:
-        print("No F1 score data available for analysis.")
-
-    print("\n--- Finished Generating All Visualizations with F1 Score ---")
+    Args:
+        df: DataFrame containing experiment results
+        output_dir: Directory to save plots
+    """
+    analyzer = ExperimentAnalyzer(df, output_dir)
+    analyzer.run_complete_analysis()
+    return analyzer.df
 
 
 def main():
