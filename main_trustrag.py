@@ -314,14 +314,20 @@ def main():
                                 {
                                     "score": adv_sim,
                                     "context": adv_text_groups[iter_idx][j],
+                                    "is_attack": 1,
                                 }
                             )  # the length of topk_results is args.top_k + len(adv_text_groups[iter_idx])
+                    # make indices that tell which is good and which is not
                     topk_results = sorted(
                         topk_results, key=lambda x: float(x["score"]), reverse=True
                     )  # Sort topk_results by score in descending order
                     topk_contents = [
                         topk_results[j]["context"] for j in range(len(topk_results))
                     ]  # only keep the topk contents
+                    is_attack_list = [
+                        topk_results[j].get("is_attack", 0)
+                        for j in range(len(topk_results))
+                    ]
                     adv_text_set = set(adv_text_groups[iter_idx])
 
                 elif args.attack_method == "pia":
@@ -342,6 +348,8 @@ def main():
                         topk_results[j]["context"] for j in range(args.top_k)
                     ]
                     topk_contents.append(pia_attack)
+                    is_attack_list = [0 for j in range(len(topk_contents))]
+                    is_attack_list[-1] = 1  # pia attack is the last one
                     adv_text_set = [pia_attack]
                 sorted_contents.append(topk_contents.copy())
             if (
@@ -364,7 +372,8 @@ def main():
                             get_emb,
                             question,
                             topk_contents,
-                            args.score_function,
+                            iter_idx,
+                            is_attack_list,
                         )
             if args.removal_method == "all":
                 topk_contents = []
