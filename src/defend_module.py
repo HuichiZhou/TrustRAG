@@ -658,7 +658,9 @@ def get_thresholds(model_code, dataset, score_function, percentile=95):
 # start_thresh, end_thresh = get_thresholds("contriever", "nq", "dot", "95th")
 
 
-def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
+def drift_filtering(
+    args, tokenizer, model, get_emb, question, contents, iter_idx, is_attack_list
+):
 
     question_top_k_adv_tokenized = tokenizer(
         [question] + contents,
@@ -687,11 +689,11 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
             ),
             dim=0,
         )
-        stop = 50
+        stop = 40
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
-        for j in range(1, stop + 2, stop):
+        for j in range(1, stop + 2, 1):  # was stop + 2, stop
             if torch.sum(current_tokenized["attention_mask"]).item() - 2 <= stop:
                 all_truncated_embeddings = torch.cat(
                     (
@@ -740,12 +742,16 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
             (
                 f"top k index: {i+1}",
                 scores[1][0::2],
+                "attack" if is_attack_list[i] else "clean",
+                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
             )
         )
         self_similarity_scores_end.append(
             (
                 f"top k index: {i+1}",
                 scores[1][1::2],
+                "attack" if is_attack_list[i] else "clean",
+                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
             )
         )
 
@@ -772,12 +778,12 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
     save_outputs(
         self_similarity_scores_start,
         args.log_name,
-        "self_similarity_scores_truncated_start",
+        f"sample_{iter_idx}_self_similarity_scores_truncated_start",
     )
     save_outputs(
         self_similarity_scores_end,
         args.log_name,
-        "self_similarity_scores_truncated_end",
+        f"sample_{iter_idx}_self_similarity_scores_truncated_end",
     )
     topk_contents = contents
     combined_mask = self_truncated_start_mask & self_truncated_end_mask
