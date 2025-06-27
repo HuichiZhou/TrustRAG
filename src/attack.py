@@ -241,6 +241,135 @@ class Attacker:
 
         return adv_text_groups
 
+    def aggd(self, target_queries, **kwargs) -> list:
+        """
+        This function implements the AGGD attack.
+        It returns adv_text_groups, which contains adv_texts for M queries.
+        For each query, if adv_per_query>1, we use different generated adv_texts or copies of the same adv_text.
+        """
+        embeddings = get_embeddings(self.c_model)
+        print("Model embedding", embeddings)
+        embedding_gradient = GradientStorage(embeddings)
+        for it_ in range(self.num_iter):
+
+            print(f"Iteration: {it_}")
+            print(f"Accumulating Gradient {args.num_grad_iter}")
+            self.c_model.zero_grad()
+            pbar = range(args.num_grad_iter)
+            train_iter = iter(dataloader)
+            grad = None
+
+            for _ in pbar:
+                try:
+                    data = next(train_iter)
+                    data = data_collator(data)  # [bsz, 3, max_len]
+                except:
+                    print("Insufficient data!")
+                    break
+
+                q_sent = {k: data[k][:, 0, :].to(device) for k in data.keys()}
+                q_emb = self.get_emb(self.model, q_sent).detach()
+
+                p_sent = {
+                    "input_ids": adv_passage_ids,
+                    "attention_mask": adv_passage_attention,
+                    "token_type_ids": adv_passage_token_type,
+                }
+                p_emb = self.get_emb(self.c_model, p_sent)
+
+                # Compute loss
+                sim = torch.mm(q_emb, p_emb.T)  # [b x k]
+
+                loss = sim.mean()
+                print("loss", loss.cpu().item())
+                loss.backward()
+
+                temp_grad = embedding_gradient.get()  # (1, 50, 768)
+                if grad is None:
+                    grad = (
+                        temp_grad.sum(dim=0) / args.num_grad_iter
+                    )  # temp_grad.sum(dim=0): (50, 768)
+                else:
+                    grad += temp_grad.sum(dim=0) / args.num_grad_iter
+
+            print("Evaluating Candidates")
+            pbar = range(args.num_grad_iter)
+            train_iter = iter(dataloader)
+            candidates = AGGD_candidate(args, grad, embeddings, depth)
+            candidate_scores, candidate_acc_rates, current_score, current_acc_rate = (
+                AGGD_candidate_score(
+                    args,
+                    it_,
+                    candidates,
+                    pbar,
+                    train_iter,
+                    data_collator,
+                    get_emb,
+                    model,
+                    c_model,
+                    adv_passage_ids,
+                    adv_passage_attention,
+                    adv_passage_token_type,
+                )
+            )
+
+            if (candidate_scores > current_score).any() or (
+                candidate_acc_rates > current_acc_rate
+            ).any():
+                print("Better adv_passage detected. Depth=", depth)
+
+                best_candidate_idx = candidate_scores.argmax()
+                adv_passage_ids[:, candidates[best_candidate_idx][0]] = torch.tensor(
+                    candidates[best_candidate_idx][1]
+                ).to(device)
+                cur_acc = evaluate_acc(
+                    model,
+                    c_model,
+                    get_emb,
+                    valid_dataloader,
+                    adv_passage_ids,
+                    adv_passage_attention,
+                    adv_passage_token_type,
+                    data_collator,
+                )
+                if cur_acc < best_acc:
+                    depth = 1
+                    best_acc = cur_acc
+                    best_adv_passage_ids = adv_passage_ids.clone()
+                    print("!!! Updated best adv_passage, Depth=", depth)
+                    print(tokenizer.convert_ids_to_tokens(best_adv_passage_ids[0]))
+                else:
+                    depth += 1
+                    print("Depth = ", depth)
+                if args.output_file is not None:
+                    with open(args.output_file, "a") as f:
+                        result = {
+                            "it": it_,
+                            "current_best_acc": best_acc,  # The best accancy achieved until iter i
+                            "best_adv_text": tokenizer.convert_ids_to_tokens(
+                                best_adv_passage_ids[0]
+                            ),
+                        }
+
+                        json.dump(result, f)
+                        f.write("\n")
+
+            else:
+                print("No improvement detected! Depth=", depth)
+                depth += 1
+                if args.output_file is not None:
+                    with open(args.output_file, "a") as f:
+                        result = {
+                            "it": it_,
+                            "current_best_acc": best_acc,  # The best accancy achieved until iter i
+                            "best_adv_text": tokenizer.convert_ids_to_tokens(
+                                best_adv_passage_ids[0]
+                            ),
+                        }
+
+                        json.dump(result, f)
+                        f.write("\n")
+
     def gcg(self, target_queries, **kwargs) -> list:
         adv_text_groups = []
         gcg_config = GCGConfig()

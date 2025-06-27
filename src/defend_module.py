@@ -687,7 +687,7 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
             ),
             dim=0,
         )
-        stop = 20
+        stop = 50
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
@@ -769,16 +769,16 @@ def drift_filtering(args, tokenizer, model, get_emb, question, contents, score):
     )
 
     # Optionally, save the self-similarity scores to a file
-    # save_outputs(
-    #     self_similarity_scores_start,
-    #     args.log_name,
-    #     "self_similarity_scores_truncated_start",
-    # )
-    # save_outputs(
-    #     self_similarity_scores_end,
-    #     args.log_name,
-    #     "self_similarity_scores_truncated_end",
-    # )
+    save_outputs(
+        self_similarity_scores_start,
+        args.log_name,
+        "self_similarity_scores_truncated_start",
+    )
+    save_outputs(
+        self_similarity_scores_end,
+        args.log_name,
+        "self_similarity_scores_truncated_end",
+    )
     topk_contents = contents
     combined_mask = self_truncated_start_mask & self_truncated_end_mask
     topk_contents = [t for t, m in zip(topk_contents, combined_mask) if m]
