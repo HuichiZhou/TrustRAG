@@ -2,7 +2,6 @@ import os
 import json
 import re
 import shutil
-from pathlib import Path
 
 
 def fix_malformed_json(content):
@@ -149,7 +148,8 @@ def fix_json_file(filepath, backup=True):
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(extracted_json)
                 return "extracted", None
-            except:
+            except Exception as e:
+                print(e)
                 # Restore original file if backup exists
                 if backup and os.path.exists(backup_path):
                     shutil.copy2(backup_path, filepath)
@@ -243,18 +243,18 @@ def main():
     print(f"Total processed: {sum(len(v) for v in results.values())}")
 
     if results["failed"]:
-        print(f"\nFailed files:")
+        print("\nFailed files:")
         for filepath in results["failed"]:
             print(f"  - {filepath}")
 
     if results["error"]:
-        print(f"\nError files:")
+        print("\nError files:")
         for filepath in results["error"]:
             print(f"  - {filepath}")
 
     if create_backup:
-        print(f"\nBackup files created with .backup extension")
-        print(f"You can delete them after verifying the fixes worked correctly")
+        print("\nBackup files created with .backup extension")
+        print("You can delete them after verifying the fixes worked correctly")
 
 
 if __name__ == "__main__":

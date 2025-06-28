@@ -1,7 +1,6 @@
 import os
 import json
 import shutil
-from pathlib import Path
 
 
 def extract_only_numbers(data):
@@ -165,8 +164,8 @@ def clean_json_files_in_directory(root_directory, target_suffixes=None, backup=T
                                 original_count = int(parts[4])
                                 stats["total_numbers_extracted"] += numbers_count
                                 stats["total_original_elements"] += original_count
-                        except:
-                            pass
+                        except Exception as e:
+                            print(e)
                 elif status == "no_numbers":
                     print(f"⚠️ No numbers found: {filepath}")
                 elif status == "parse_error":
@@ -217,7 +216,7 @@ def main():
     print(f"Other errors: {len(results['error'])}")
 
     if stats["total_numbers_extracted"] > 0:
-        print(f"\nData processed:")
+        print("\nData processed:")
         print(f"Total numbers extracted: {stats['total_numbers_extracted']:,}")
         print(f"Total original elements: {stats['total_original_elements']:,}")
         reduction_percent = (
@@ -228,29 +227,29 @@ def main():
 
     # Show problematic files
     if results["no_numbers"]:
-        print(f"\nFiles with no numbers found:")
+        print("\nFiles with no numbers found:")
         for filepath in results["no_numbers"][:10]:  # Show first 10
             print(f"  - {filepath}")
         if len(results["no_numbers"]) > 10:
             print(f"  ... and {len(results['no_numbers']) - 10} more")
 
     if results["parse_error"]:
-        print(f"\nFiles with parse errors:")
+        print("\nFiles with parse errors:")
         for filepath in results["parse_error"][:10]:  # Show first 10
             print(f"  - {filepath}")
         if len(results["parse_error"]) > 10:
             print(f"  ... and {len(results['parse_error']) - 10} more")
 
     if results["error"]:
-        print(f"\nFiles with other errors:")
+        print("\nFiles with other errors:")
         for filepath in results["error"][:10]:  # Show first 10
             print(f"  - {filepath}")
         if len(results["error"]) > 10:
             print(f"  ... and {len(results['error']) - 10} more")
 
     if create_backup:
-        print(f"\nBackup files created with .backup extension")
-        print(f"You can delete them after verifying the results")
+        print("\nBackup files created with .backup extension")
+        print("You can delete them after verifying the results")
 
 
 if __name__ == "__main__":

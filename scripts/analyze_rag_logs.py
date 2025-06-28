@@ -7,7 +7,6 @@ import seaborn as sns
 import argparse
 import numpy as np  # For NaN values
 
-from typing import List, Dict, Optional
 
 
 def parse_log_file(file_path):
@@ -134,18 +133,18 @@ def find_incomplete_logs(logs_dir, delete_incomplete=False):
                 else:
                     incomplete_logs.append(file_path)
 
-    print(f"\n=== LOG COMPLETION ANALYSIS ===")
+    print("\n=== LOG COMPLETION ANALYSIS ===")
     print(f"Total log files found: {len(complete_logs) + len(incomplete_logs)}")
     print(f"Complete logs: {len(complete_logs)}")
     print(f"Incomplete logs: {len(incomplete_logs)}")
 
     if incomplete_logs:
-        print(f"\n=== INCOMPLETE LOG FILES ===")
+        print("\n=== INCOMPLETE LOG FILES ===")
         for log_file in incomplete_logs:
             print(f"  - {log_file}")
 
         if delete_incomplete:
-            print(f"\n=== DELETING INCOMPLETE LOGS ===")
+            print("\n=== DELETING INCOMPLETE LOGS ===")
             deleted_count = 0
             for log_file in incomplete_logs:
                 try:
@@ -464,7 +463,7 @@ class ExperimentAnalyzer:
         ]
 
         if comparable_data.empty:
-            print(f"No complete pairs found for comparison.")
+            print("No complete pairs found for comparison.")
             return
 
         # Print summary

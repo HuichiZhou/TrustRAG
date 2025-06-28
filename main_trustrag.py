@@ -83,7 +83,7 @@ def parse_args():
         "--attack_method",
         type=str,
         default="LM_targeted",
-        choices=["none", "LM_targeted", "hotflip", "pia", "gcg"],
+        choices=["none", "LM_targeted", "hotflip", "pia", "aggd"],
     )
     parser.add_argument(
         "--adv_per_query",

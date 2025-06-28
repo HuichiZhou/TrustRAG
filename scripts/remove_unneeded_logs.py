@@ -4,8 +4,6 @@ TrustRAG Unneeded Logs Cleaner
 Removes logs that meet certain criteria for being unnecessary
 """
 
-import os
-import re
 from pathlib import Path
 from collections import defaultdict
 
@@ -127,15 +125,15 @@ class TrustRAGLogsCleaner:
             reason = item["reason"]
 
             if reason == "both_sides_duplicate":
-                print(f"   🔍 Found both_sides/both_combined duplicate:")
+                print("   🔍 Found both_sides/both_combined duplicate:")
                 print(f"      🗑️  DELETE: {file_to_delete.name}")
                 print(f"      ✅ KEEP:   {file_to_keep.name}")
             elif reason == "attack_none_wrong_query_count":
-                print(f"   🎯 Found unneeded attack_none log:")
+                print("   🎯 Found unneeded attack_none log:")
                 print(f"      🗑️  DELETE: {file_to_delete.name}")
-                print(f"      📝 REASON: attack_none should only use q3")
+                print("      📝 REASON: attack_none should only use q3")
             else:
-                print(f"   🗑️  Found unneeded log:")
+                print("   🗑️  Found unneeded log:")
                 print(f"      🗑️  DELETE: {file_to_delete.name}")
                 print(f"      📝 REASON: {reason}")
 

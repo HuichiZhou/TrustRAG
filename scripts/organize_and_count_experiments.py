@@ -4,7 +4,6 @@ TrustRAG Experiment Counter and Organizer
 Analyzes log files to count different experimental configurations
 """
 
-import os
 import re
 from collections import defaultdict, Counter
 from pathlib import Path

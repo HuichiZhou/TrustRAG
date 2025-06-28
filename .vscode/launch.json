@@ -16,7 +16,8 @@
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
                 "--removal_method=drift",
-                "--attack_method=LM_targeted", // hotflip
+                // "--attack_method=LM_targeted",
+                "--attack_method=hotflip",
                 // "--attack_method=hotflip",
                 "--defend_method=none",
                 // "--model_name=gpt-4o",
@@ -26,9 +27,9 @@
                 "--eval_model_code=contriever",
                 "--M=1",
                 "--repeat_times=1",
-                "--adv_per_query=5",
-                "--score_function=dot",
-                "--adv_a_position=start",
+                "--adv_per_query=2",
+                "--score_function=cos_sim",
+                "--adv_a_position=end",
                 // "--llm_flag"
             ]
         },
