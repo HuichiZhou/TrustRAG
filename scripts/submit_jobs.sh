@@ -9,7 +9,7 @@ removals=('drift') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('cos_sim') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'
-advs_per_query=(5)
+advs_per_query=(1 3)
 
 
 index=1  # Initialize counter

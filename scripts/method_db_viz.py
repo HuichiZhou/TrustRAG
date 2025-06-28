@@ -322,7 +322,8 @@ class SimilarityScoreAnalyzer:
             "hotflip": "#DC143C",  # Crimson
             "aggd": "#4169E1",  # Royal Blue
         }
-
+        print(f"token length in group {group_name}")
+        data["token_length"].describe()
         # Separate data by type
         clean_data = data[data["attack_or_clean"] == "clean"]
         hotflip_data = (
