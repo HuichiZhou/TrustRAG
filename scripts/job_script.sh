@@ -34,13 +34,13 @@ repeat_times=10
 M=10                            # number of queries
 split="test"
 top_k=5
-llm_flag=true
+llm_flag=false
 llm_arg=""
 if $llm_flag; then
     llm_arg="--llm_flag"
 fi
-
-log_name="test_method_dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-Top_${top_k}-Seed_${seed}_both_combined"
+# Don't forget to change back
+log_name="dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-Top_${top_k}-Seed_${seed}_both_combined"
 
 huggingface-cli whoami
 # Run the Python script with the parameters passed from the environment

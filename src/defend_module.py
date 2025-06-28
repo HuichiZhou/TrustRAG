@@ -640,7 +640,7 @@ def get_thresholds(model_code, dataset, score_function, percentile=95):
         dataset_config = model_config[dataset]
         score_config = dataset_config[score_function]
         return score_config["start"], score_config["end"]
-    except KeyError as e:
+    except KeyError:
         available_configs = []
         if model_code in threshold_dict:
             for ds in threshold_dict[model_code]:
@@ -689,11 +689,12 @@ def drift_filtering(
             ),
             dim=0,
         )
-        stop = 40
+        # todo - remove
+        stop = 30
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
-        for j in range(1, stop + 2, 1):  # was stop + 2, stop
+        for j in range(1, stop + 2, stop):  # was stop + 2, stop
             if torch.sum(current_tokenized["attention_mask"]).item() - 2 <= stop:
                 all_truncated_embeddings = torch.cat(
                     (
