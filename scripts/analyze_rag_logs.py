@@ -8,7 +8,6 @@ import argparse
 import numpy as np  # For NaN values
 
 
-
 def parse_log_file(file_path):
     """
     Extracts data from a single log file.
@@ -607,7 +606,7 @@ class ExperimentAnalyzer:
             )
             return
 
-        attack_types = ["none", "hotflip"]
+        attack_types = ["none", "hotflip", "aggd"]
         score_functions = ["dot", "cos"]
 
         # Generate plots for each combination

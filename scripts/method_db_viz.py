@@ -276,7 +276,8 @@ class SimilarityScoreAnalyzer:
             for group_name, group_data in grouped:
                 if plot_idx >= len(axes):
                     break
-
+                print(f"token length in group {group_name}_{score_func}:")
+                print(group_data["token_length"].describe())
                 ax = axes[plot_idx]
                 self._create_single_attack_comparison_plot(
                     group_data, group_name, False, ax
@@ -322,8 +323,7 @@ class SimilarityScoreAnalyzer:
             "hotflip": "#DC143C",  # Crimson
             "aggd": "#4169E1",  # Royal Blue
         }
-        print(f"token length in group {group_name}")
-        data["token_length"].describe()
+
         # Separate data by type
         clean_data = data[data["attack_or_clean"] == "clean"]
         hotflip_data = (

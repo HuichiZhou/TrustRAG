@@ -34,7 +34,7 @@ repeat_times=10
 M=10                            # number of queries
 split="test"
 top_k=5
-llm_flag=false
+llm_flag=true
 llm_arg=""
 if $llm_flag; then
     llm_arg="--llm_flag"
