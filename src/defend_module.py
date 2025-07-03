@@ -776,16 +776,16 @@ def drift_filtering(
     )
 
     # Optionally, save the self-similarity scores to a file
-    # save_outputs(
-    #     self_similarity_scores_start,
-    #     args.log_name,
-    #     f"sample_{iter_idx}_self_similarity_scores_truncated_start",
-    # )
-    # save_outputs(
-    #     self_similarity_scores_end,
-    #     args.log_name,
-    #     f"sample_{iter_idx}_self_similarity_scores_truncated_end",
-    # )
+    save_outputs(
+        self_similarity_scores_start,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_truncated_start",
+    )
+    save_outputs(
+        self_similarity_scores_end,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_truncated_end",
+    )
     topk_contents = contents
     combined_mask = self_truncated_start_mask & self_truncated_end_mask
     topk_contents = [t for t, m in zip(topk_contents, combined_mask) if m]

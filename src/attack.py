@@ -68,8 +68,10 @@ class Attacker:
         """
         if self.attack_method == "LM_targeted":
             adv_text_groups = self.pia(target_queries)
-        elif self.attack_method == "hotflip":
-            adv_text_groups = self.hotflip(target_queries)
+        elif "hotflip" in self.attack_method:
+            adv_text_groups = self.hotflip(
+                target_queries,
+            )
         elif self.attack_method == "aggd":
             adv_text_groups = self.aggd(target_queries)
         else:
@@ -361,32 +363,35 @@ class Attacker:
                     best_adv_passage_ids = adv_passage_ids.clone()
                     best_sim = 0
 
-                # Run iterations
-                for _ in range(self.num_iter):
-                    if attack_type == "hotflip":
-                        self._hotflip_iteration(
-                            adv_passage_ids,
-                            adv_passage_attention,
-                            adv_passage_token_type,
-                            q_emb,
-                            embeddings,
-                            embedding_gradient,
-                            adv_a_len,
-                            adv_b_len,
-                        )
-                    elif attack_type == "aggd":
-                        (depth, best_sim, best_adv_passage_ids) = self._aggd_iteration(
-                            adv_passage_ids,
-                            adv_passage_attention,
-                            adv_passage_token_type,
-                            q_emb,
-                            embeddings,
-                            embedding_gradient,
-                            depth,
-                            best_sim,
-                            adv_a_len,
-                            adv_b_len,
-                        )
+                if "blackbox" not in self.attack_method:
+                    # Run iterations
+                    for _ in range(self.num_iter):
+                        if attack_type == "hotflip":
+                            self._hotflip_iteration(
+                                adv_passage_ids,
+                                adv_passage_attention,
+                                adv_passage_token_type,
+                                q_emb,
+                                embeddings,
+                                embedding_gradient,
+                                adv_a_len,
+                                adv_b_len,
+                            )
+                        elif attack_type == "aggd":
+                            (depth, best_sim, best_adv_passage_ids) = (
+                                self._aggd_iteration(
+                                    adv_passage_ids,
+                                    adv_passage_attention,
+                                    adv_passage_token_type,
+                                    q_emb,
+                                    embeddings,
+                                    embedding_gradient,
+                                    depth,
+                                    best_sim,
+                                    adv_a_len,
+                                    adv_b_len,
+                                )
+                            )
 
                 # Decode final adversarial text
                 final_ids = (

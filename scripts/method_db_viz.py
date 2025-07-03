@@ -354,6 +354,11 @@ class SimilarityScoreAnalyzer:
             # Calculate mean and std at each position
             x_values = range(max_len)
             y_values = np.mean(sim_vals, axis=0)
+            # TODO - maybe normalize y_values
+            # y_max = np.max(y_values)
+            # y_min = np.min(y_values)
+            # y_values = (y_values - y_min) / (y_max - y_min)  # Normalize to [0, 1]
+            # Calculate std deviation
             y_stds = np.std(sim_vals, axis=0)
 
             # Plot line with std deviation band
