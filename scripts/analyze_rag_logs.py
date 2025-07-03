@@ -95,9 +95,10 @@ def check_log_completion(file_path):
     Returns True if complete, False if incomplete.
     """
     required_patterns = [
-        r"Correct Answer Percentage: \d+\.\d+%",
-        r"Incorrect Answer Percentage: \d+\.\d+%",
         r"Total run time for inference, removal and defense: \d+\.\d+",
+        # r"Correct Answer Percentage: \d+\.\d+%",
+        # r"Incorrect Answer Percentage: \d+\.\d+%",
+        # r"Total run time for inference, removal and defense: \d+\.\d+",
     ]
 
     try:
