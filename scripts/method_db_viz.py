@@ -336,14 +336,24 @@ class SimilarityScoreAnalyzer:
             if "attack_type" in data.columns
             else data[data["attack_or_clean"] == "aggd"]
         )
+        blackbox_hotflip_data = (
+            data[data["attack_type"] == "blackbox_hotflip"]
+            if "attack_type" in data.columns
+            else data[data["attack_or_clean"] == "blackbox_hotflip"]
+        )
+
+        drift_kmeans_ngram_data = (
+            data[data["removal_method"] == "drift_kmeans_ngram"]
+            if "removal_method" in data.columns
+            else None
+        )
 
         # Function to calculate and plot line with std deviation
         def plot_attack_line(attack_data, label, color):
-            if attack_data.empty:
+            if attack_data is None or attack_data.empty:
                 print(f"Warning: No data found for {label} in group {group_name}")
                 return
 
-            # Fallback: use similarity_values position as proxy
             max_len = max(
                 [len(vals) for vals in attack_data["similarity_values"]] + [0]
             )
@@ -351,17 +361,9 @@ class SimilarityScoreAnalyzer:
                 return
             sim_vals = np.array(attack_data["similarity_values"].tolist())
 
-            # Calculate mean and std at each position
             x_values = range(max_len)
             y_values = np.mean(sim_vals, axis=0)
-            # TODO - maybe normalize y_values
-            # y_max = np.max(y_values)
-            # y_min = np.min(y_values)
-            # y_values = (y_values - y_min) / (y_max - y_min)  # Normalize to [0, 1]
-            # Calculate std deviation
             y_stds = np.std(sim_vals, axis=0)
-
-            # Plot line with std deviation band
             ax.plot(
                 x_values, y_values, color=color, linewidth=2, label=label, alpha=0.8
             )
@@ -372,12 +374,12 @@ class SimilarityScoreAnalyzer:
                 color=color,
                 alpha=0.2,
             )
-            return
 
         # Plot each attack type
         plot_attack_line(clean_data, "Clean", colors["clean"])
         plot_attack_line(hotflip_data, "HotFlip", colors["hotflip"])
         plot_attack_line(aggd_data, "AGGD", colors["aggd"])
+        plot_attack_line(blackbox_hotflip_data, "Blackbox HotFlip Attack", "orange")
 
         # Customize plot
         ax.set_xlabel("Number of Removed Tokens")
