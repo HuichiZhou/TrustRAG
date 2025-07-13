@@ -579,21 +579,23 @@ class ExperimentAnalyzer:
                         )
 
     def create_dataset_performance_barplots(self):
-        """Create barplots comparing kmeans vs drift methods for each dataset."""
-        print("\n--- Creating Dataset Performance Barplots (KMeans vs Drift) ---")
+        """Create barplots comparing kmeans, drift, and drift_kmeans_ngram methods for each dataset."""
+        print(
+            "\n--- Creating Dataset Performance Barplots (KMeans, Drift, DriftKMeansNGram) ---"
+        )
 
         if not self.has_dataset:
             print("No dataset column found. Skipping dataset performance barplots.")
             return
 
-        # Filter data: only include "kmeans" and "drift" removal methods
+        # Filter data: only include "kmeans_ngram", "drift", and "drift_kmeans_ngram" removal methods
         filtered_data = self.df[
-            self.df["removal"].isin(["kmeans_ngram", "drift"])
+            self.df["removal"].isin(["kmeans_ngram", "drift", "drift_kmeans_ngram"])
         ].copy()
 
         if filtered_data.empty:
             print(
-                "No data available for kmeans or drift removal methods. Skipping dataset barplots."
+                "No data available for kmeans, drift, or drift_kmeans_ngram removal methods. Skipping dataset barplots."
             )
             return
 
@@ -607,7 +609,8 @@ class ExperimentAnalyzer:
             )
             return
 
-        attack_types = ["none", "hotflip", "aggd"]
+        # Update attack types to include blackbox_hotflip and aggd
+        attack_types = ["none", "hotflip", "aggd", "blackbox_hotflip"]
         score_functions = ["dot", "cos"]
 
         # Generate plots for each combination
@@ -648,11 +651,12 @@ class ExperimentAnalyzer:
 
                     # Prepare data for grouped bar plot
                     x = np.arange(len(datasets))
-                    width = 0.35
+                    width = 0.22
 
-                    # Get data for kmeans and drift methods
+                    # Get data for kmeans, drift, and drift_kmeans_ngram methods
                     kmeans_scores = []
                     drift_scores = []
+                    drift_kmeans_ngram_scores = []
 
                     for dataset in datasets:
                         dataset_data = avg_data[avg_data["dataset"] == dataset]
@@ -661,6 +665,9 @@ class ExperimentAnalyzer:
                             dataset_data["removal"] == "kmeans_ngram"
                         ]
                         drift_row = dataset_data[dataset_data["removal"] == "drift"]
+                        drift_kmeans_ngram_row = dataset_data[
+                            dataset_data["removal"] == "drift_kmeans_ngram"
+                        ]
 
                         kmeans_score = (
                             kmeans_row[metric].iloc[0]
@@ -670,13 +677,19 @@ class ExperimentAnalyzer:
                         drift_score = (
                             drift_row[metric].iloc[0] if not drift_row.empty else np.nan
                         )
+                        drift_kmeans_ngram_score = (
+                            drift_kmeans_ngram_row[metric].iloc[0]
+                            if not drift_kmeans_ngram_row.empty
+                            else np.nan
+                        )
 
                         kmeans_scores.append(kmeans_score)
                         drift_scores.append(drift_score)
+                        drift_kmeans_ngram_scores.append(drift_kmeans_ngram_score)
 
                     # Create bars
                     bars1 = plt.bar(
-                        x - width / 2,
+                        x - width,
                         kmeans_scores,
                         width,
                         label="TrustRAG",
@@ -684,16 +697,28 @@ class ExperimentAnalyzer:
                         alpha=0.8,
                     )
                     bars2 = plt.bar(
-                        x + width / 2,
+                        x,
                         drift_scores,
                         width,
                         label="Drift",
                         color="darkcyan",
                         alpha=0.8,
                     )
+                    bars3 = plt.bar(
+                        x + width,
+                        drift_kmeans_ngram_scores,
+                        width,
+                        label="DriftKMeansNGram",
+                        color="goldenrod",
+                        alpha=0.8,
+                    )
 
                     # Add value labels on bars
-                    for bars, scores in [(bars1, kmeans_scores), (bars2, drift_scores)]:
+                    for bars, scores in [
+                        (bars1, kmeans_scores),
+                        (bars2, drift_scores),
+                        (bars3, drift_kmeans_ngram_scores),
+                    ]:
                         for bar, score in zip(bars, scores):
                             if not np.isnan(score):
                                 height = bar.get_height()
@@ -730,7 +755,11 @@ class ExperimentAnalyzer:
 
                     # Set y-axis limits for better visualization
                     all_scores = [
-                        s for s in kmeans_scores + drift_scores if not np.isnan(s)
+                        s
+                        for s in kmeans_scores
+                        + drift_scores
+                        + drift_kmeans_ngram_scores
+                        if not np.isnan(s)
                     ]
                     if all_scores:
                         y_min = max(0, min(all_scores) - 0.05)
@@ -758,34 +787,52 @@ class ExperimentAnalyzer:
                 # Create combined plot showing all three metrics for this attack/score combination
                 if len(available_metrics) > 1:
                     self._create_combined_metrics_comparison_plot(
-                        avg_data, available_metrics, attack, score_func, datasets
+                        avg_data,
+                        available_metrics,
+                        attack,
+                        score_func,
+                        datasets,
+                        include_drift_kmeans_ngram=True,  # Pass flag to include new method
                     )
 
     def _create_combined_metrics_comparison_plot(
-        self, avg_data: pd.DataFrame, metrics, attack: str, score_func: str, datasets
+        self,
+        avg_data: pd.DataFrame,
+        metrics,
+        attack: str,
+        score_func: str,
+        datasets,
+        include_drift_kmeans_ngram=False,
     ):
-        """Create a combined plot comparing kmeans vs drift across all metrics."""
+        """Create a combined plot comparing kmeans, drift, and drift_kmeans_ngram across all metrics."""
         fig, axes = plt.subplots(1, len(metrics), figsize=(5 * len(metrics), 6))
         if len(metrics) == 1:
             axes = [axes]
 
-        colors = {"kmeans_ngram": "darkslateblue", "drift": "darkcyan"}
+        colors = {
+            "kmeans_ngram": "darkslateblue",
+            "drift": "darkcyan",
+            "drift_kmeans_ngram": "goldenrod",
+        }
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
 
-            # Prepare data for this metric
             x = np.arange(len(datasets))
-            width = 0.35
+            width = 0.22
 
             kmeans_scores = []
             drift_scores = []
+            drift_kmeans_ngram_scores = []
 
             for dataset in datasets:
                 dataset_data = avg_data[avg_data["dataset"] == dataset]
 
                 kmeans_row = dataset_data[dataset_data["removal"] == "kmeans_ngram"]
                 drift_row = dataset_data[dataset_data["removal"] == "drift"]
+                drift_kmeans_ngram_row = dataset_data[
+                    dataset_data["removal"] == "drift_kmeans_ngram"
+                ]
 
                 kmeans_score = (
                     kmeans_row[metric].iloc[0] if not kmeans_row.empty else np.nan
@@ -793,13 +840,19 @@ class ExperimentAnalyzer:
                 drift_score = (
                     drift_row[metric].iloc[0] if not drift_row.empty else np.nan
                 )
+                drift_kmeans_ngram_score = (
+                    drift_kmeans_ngram_row[metric].iloc[0]
+                    if not drift_kmeans_ngram_row.empty
+                    else np.nan
+                )
 
                 kmeans_scores.append(kmeans_score)
                 drift_scores.append(drift_score)
+                drift_kmeans_ngram_scores.append(drift_kmeans_ngram_score)
 
             # Create bars
             bars1 = ax.bar(
-                x - width / 2,
+                x - width,
                 kmeans_scores,
                 width,
                 label="TrustRAG" if idx == 0 else "",
@@ -807,16 +860,33 @@ class ExperimentAnalyzer:
                 alpha=0.8,
             )
             bars2 = ax.bar(
-                x + width / 2,
+                x,
                 drift_scores,
                 width,
                 label="Drift" if idx == 0 else "",
                 color=colors["drift"],
                 alpha=0.8,
             )
+            if include_drift_kmeans_ngram:
+                bars3 = ax.bar(
+                    x + width,
+                    drift_kmeans_ngram_scores,
+                    width,
+                    label="DriftKMeansNGram" if idx == 0 else "",
+                    color=colors["drift_kmeans_ngram"],
+                    alpha=0.8,
+                )
 
             # Add value labels
-            for bars, scores in [(bars1, kmeans_scores), (bars2, drift_scores)]:
+            for bars, scores in [
+                (bars1, kmeans_scores),
+                (bars2, drift_scores),
+                (
+                    (bars3, drift_kmeans_ngram_scores)
+                    if include_drift_kmeans_ngram
+                    else ([], [])
+                ),
+            ]:
                 for bar, score in zip(bars, scores):
                     if not np.isnan(score):
                         height = bar.get_height()
