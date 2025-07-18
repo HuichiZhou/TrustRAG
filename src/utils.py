@@ -338,7 +338,7 @@ def get_tokenized_sentence_block_removed(tokenized, block_start: int, block_size
         dict: Modified tokenized input with the block removed.
     """
     keys = ["input_ids", "token_type_ids", "attention_mask"]
-    tensors = {k: tokenized[k] for k in keys}
+    tensors = {k: tokenized[k] for k in tokenized.keys() if k in keys}
 
     valid_token_count = tokenized["attention_mask"].sum(dim=1)
     # Ensure there is room to remove a block between SOS and EOS
@@ -359,5 +359,8 @@ def get_tokenized_sentence_block_removed(tokenized, block_start: int, block_size
         k: v[:, 1 + block_end : valid_token_count - 1] for k, v in tensors.items()
     }  # before EOS
 
-    out = {k: torch.cat([sos[k], before[k], after[k], eos[k]], dim=1) for k in keys}
+    out = {
+        k: torch.cat([sos[k], before[k], after[k], eos[k]], dim=1)
+        for k in tensors.keys()
+    }
     return out

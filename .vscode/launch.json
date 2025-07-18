@@ -14,23 +14,23 @@
             "justMyCode": false,
             "args": [
                 "--log_name=test-llama",
-                "--eval_dataset=nq",
-                "--removal_method=drift",
+                "--eval_dataset=hotpotqa",
+                "--removal_method=drift_window",
                 // "--attack_method=LM_targeted",
                 "--attack_method=blackbox_hotflip",
                 // "--attack_method=hotflip",
+                // "--attack_method=aggd",
                 "--defend_method=none",
                 // "--model_name=gpt-4o",
                 "--model_name=meta-llama/Llama-3.1-8B-Instruct",
                 // "--model_name=mistralai/Mistral-Nemo-Instruct-2407",
-                // "--eval_model_code=contriever",
-                "--eval_model_code=contriever",
+                "--eval_model_code=ance",
                 "--M=10",
-                "--repeat_times=1",
+                "--repeat_times=10",
                 "--adv_per_query=3",
                 "--score_function=dot",
                 "--adv_a_position=end",
-                "--llm_flag"
+                // "--llm_flag"
             ]
         },
         {

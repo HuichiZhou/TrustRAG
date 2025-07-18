@@ -22,7 +22,9 @@ from src.defend_module import (
     astute_query,
     conflict_query,
     conflict_query_gpt,
-    drift_filtering,
+    drift_filtering_sliding_window,
+    drift_filtering_truncation,
+    drift_filtering_uniform,
     instructrag_query,
     instructrag_query_gpt,
     astute_query_gpt,
@@ -117,6 +119,8 @@ def parse_args():
             "kmeans",
             "kmeans_ngram",
             "drift",
+            "drift_window",
+            "drift_uniform",
             "drift_kmeans_ngram",
             "all",
         ],
@@ -352,10 +356,7 @@ def main():
                     is_attack_list[-1] = 1  # pia attack is the last one
                     adv_text_set = [pia_attack]
                 sorted_contents.append(topk_contents.copy())
-            if (
-                args.removal_method
-                in ["drift", "kmeans", "kmeans_ngram", "drift_kmeans_ngram"]
-            ) and args.top_k != 1:
+            if (args.removal_method not in ["all", "none"]) and args.top_k != 1:
                 with timed(f"Iter_{iter}_question_{i}_removal"):
                     if "kmeans" in args.removal_method:
                         topk_contents = k_mean_filtering(
@@ -365,16 +366,39 @@ def main():
                             "ngram" in args.removal_method,
                         )
                     if "drift" in args.removal_method:
-                        topk_contents = drift_filtering(
-                            args,
-                            tokenizer,
-                            model,
-                            get_emb,
-                            question,
-                            topk_contents,
-                            iter_idx,
-                            is_attack_list,
-                        )
+                        if "window" in args.removal_method:
+                            topk_contents = drift_filtering_sliding_window(
+                                args,
+                                tokenizer,
+                                model,
+                                get_emb,
+                                question,
+                                topk_contents,
+                                iter_idx,
+                                is_attack_list,
+                            )
+                        elif "random" in args.removal_method:
+                            topk_contents = drift_filtering_uniform(
+                                args,
+                                tokenizer,
+                                model,
+                                get_emb,
+                                question,
+                                topk_contents,
+                                iter_idx,
+                                is_attack_list,
+                            )
+                        else:
+                            topk_contents = drift_filtering_truncation(
+                                args,
+                                tokenizer,
+                                model,
+                                get_emb,
+                                question,
+                                topk_contents,
+                                iter_idx,
+                                is_attack_list,
+                            )
             if args.removal_method == "all":
                 topk_contents = []
             if topk_contents:

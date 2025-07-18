@@ -7,6 +7,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from itertools import combinations
 from .utils import (
     cos_similarity,
+    get_tokenized_sentence_block_removed,
     get_tokenized_sentence_sliced,
     progress_bar,
     save_outputs,
@@ -304,8 +305,50 @@ def similarity_filtering(topk_embeddings, topk_contents):
     return topk_contents
 
 
+WINDOW_THRESHOLDS = {
+    # Thresholds based on 5th highest quantile (95th percentile)
+    95: {
+        "ance": {
+            "hotpotqa": {"dot": 0},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 0},
+            "msmarco": {"dot": 0},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 0},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 0},
+            "msmarco": {"dot": 0},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 0},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 0},
+            "msmarco": {"dot": 0},
+        },
+        "minilm": {
+            "hotpotqa": {"cos_sim": 0},
+            "mirage": {"cos_sim": 0},
+            "nq": {"cos_sim": 0},
+            "msmarco": {"cos_sim": 0},
+        },
+        "mpnet": {
+            "hotpotqa": {"cos_sim": 0},
+            "mirage": {"cos_sim": 0},
+            "nq": {"cos_sim": 0},
+            "msmarco": {"cos_sim": 0},
+        },
+        "roberta": {
+            "hotpotqa": {"cos_sim": 0},
+            "mirage": {"cos_sim": 0},
+            "nq": {"cos_sim": 0},
+            "msmarco": {"cos_sim": 0},
+        },
+    }
+}
+
 # Thresholds based on quantiles
-THRESHOLDS = {
+TRUNCATION_THRESHOLDS = {
     # Thresholds based on 5th highest quantile (95th percentile)
     95: {
         "ance": {
@@ -616,7 +659,7 @@ THRESHOLDS = {
 }
 
 
-def get_thresholds(model_code, dataset, score_function, percentile=95):
+def get_thresholds_truncation(model_code, dataset, score_function, percentile=95):
     """
     Get thresholds for given model, dataset, score function, and percentile.
 
@@ -635,7 +678,7 @@ def get_thresholds(model_code, dataset, score_function, percentile=95):
     if model_code in ["minilm", "mpnet", "roberta"]:
         percentile = 80
     try:
-        threshold_dict = THRESHOLDS[percentile]
+        threshold_dict = TRUNCATION_THRESHOLDS[percentile]
         model_config = threshold_dict[model_code]
         dataset_config = model_config[dataset]
         score_config = dataset_config[score_function]
@@ -653,12 +696,42 @@ def get_thresholds(model_code, dataset, score_function, percentile=95):
         )
 
 
-# Usage examples:
-# start_thresh, end_thresh = get_thresholds("ance", "hotpotqa", "cos_sim", "90th")
-# start_thresh, end_thresh = get_thresholds("contriever", "nq", "dot", "95th")
+def get_thresholds_window(model_code, dataset, score_function, percentile=95):
+    """
+    Get thresholds for given model, dataset, score function, and percentile.
+
+    Args:
+        model_code: Model identifier (e.g., "ance", "contriever")
+        dataset: Dataset name (e.g., "hotpotqa", "mirage")
+        score_function: Scoring function ("cos_sim" or "dot")
+        percentile: Which percentile to use (90 or 95)
+
+    Returns:
+        tuple: (start_threshold, end_threshold)
+
+    Raises:
+        ValueError: If configuration not found
+    """
+    try:
+        threshold_dict = WINDOW_THRESHOLDS[percentile]
+        model_config = threshold_dict[model_code]
+        dataset_config = model_config[dataset]
+        score_config = dataset_config[score_function]
+        return score_config
+    except KeyError:
+        available_configs = []
+        if model_code in threshold_dict:
+            for ds in threshold_dict[model_code]:
+                for sf in threshold_dict[model_code][ds]:
+                    available_configs.append(f"{model_code}/{ds}/{sf}")
+
+        raise ValueError(
+            f"No {percentile} percentile threshold configuration found for {model_code}/{dataset}/{score_function}. "
+            f"Available configurations: {available_configs}"
+        )
 
 
-def drift_filtering(
+def drift_filtering_truncation(
     args, tokenizer, model, get_emb, question, contents, iter_idx, is_attack_list
 ):
 
@@ -764,7 +837,264 @@ def drift_filtering(
     self_truncated_start_scores = self_scores[:, 0::2]
     self_truncated_end_scores = self_scores[:, 1::2]
 
-    start_thresh, end_thresh = get_thresholds(
+    start_thresh, end_thresh = get_thresholds_truncation(
+        args.eval_model_code, args.eval_dataset, args.score_function
+    )
+    self_truncated_start_mask = diff_scores_mask(
+        self_truncated_start_scores,
+        threshold=start_thresh,
+    )
+    self_truncated_end_mask = diff_scores_mask(
+        self_truncated_end_scores, threshold=end_thresh
+    )
+
+    # Optionally, save the self-similarity scores to a file
+    save_outputs(
+        self_similarity_scores_start,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_truncated_start",
+    )
+    save_outputs(
+        self_similarity_scores_end,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_truncated_end",
+    )
+    topk_contents = contents
+    combined_mask = self_truncated_start_mask & self_truncated_end_mask
+    topk_contents = [t for t, m in zip(topk_contents, combined_mask) if m]
+    return topk_contents
+
+
+def drift_filtering_sliding_window(
+    args,
+    tokenizer,
+    model,
+    get_emb,
+    question,
+    contents,
+    iter_idx,
+    is_attack_list,
+    window_size=20,
+):
+    question_top_k_adv_tokenized = tokenizer(
+        [question] + contents,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+    )
+    question_top_k_adv_tokenized = {
+        key: value.cuda() for key, value in question_top_k_adv_tokenized.items()
+    }
+    top_k_adv_tokenized = {
+        key: value[1:] for key, value in question_top_k_adv_tokenized.items()
+    }
+    question_top_k_adv_embedded = get_emb(model, question_top_k_adv_tokenized)
+    question_embed = question_top_k_adv_embedded[0].unsqueeze(0)
+    self_similarity_scores = []
+    self_scores = []
+    for i in range(0, len(top_k_adv_tokenized["input_ids"])):
+        # truncating the sentence
+        current_embedded = question_top_k_adv_embedded[i + 1].unsqueeze(0)
+        all_truncated_embeddings = torch.cat(
+            [
+                current_embedded,
+            ],
+            dim=0,
+        )
+        current_tokenized = {
+            key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
+        }
+        avaliable_tokens = torch.sum(current_tokenized["attention_mask"]).item() - 2
+        for j in range(0, avaliable_tokens, window_size):
+            if avaliable_tokens <= window_size:
+                all_truncated_embeddings = torch.cat(
+                    (
+                        all_truncated_embeddings,
+                        current_embedded,
+                    ),
+                    dim=0,
+                )
+                continue
+            current_tokenized_without_window = get_tokenized_sentence_block_removed(
+                current_tokenized, j, window_size
+            )
+            current_embedded_without_window = get_emb(
+                model, current_tokenized_without_window
+            )
+            all_truncated_embeddings = torch.cat(
+                (
+                    all_truncated_embeddings,
+                    current_embedded_without_window,
+                ),
+                dim=0,
+            )
+        question_current_embedded = torch.cat((question_embed, current_embedded))
+        if args.score_function == "dot":
+            scores = torch.mm(
+                question_current_embedded,
+                all_truncated_embeddings.T,
+            )
+        elif args.score_function == "cos_sim":
+            scores = cos_similarity(question_current_embedded, all_truncated_embeddings)
+        scores = scores.cpu().detach().numpy().round(4)
+        self_scores.append(scores[1])
+        self_similarity_scores.append(
+            (
+                f"top k index: {i+1}",
+                scores[1],
+                "attack" if is_attack_list[i] else "clean",
+                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
+            )
+        )
+
+    if self_scores:  # Check if list is not empty
+        # Find the maximum length among all score arrays
+        max_length = max(len(score) for score in self_scores)
+
+        # Pad shorter arrays by duplicating the last element
+        padded_scores = []
+        for score in self_scores:
+            if len(score) < max_length:
+                # Duplicate the last element to reach max_length
+                last_element = score[-1]
+                padding_needed = max_length - len(score)
+                padded_score = np.concatenate(
+                    [score, np.full(padding_needed, last_element)]
+                )
+            else:
+                padded_score = score
+            padded_scores.append(padded_score)
+        self_scores = np.vstack(padded_scores)
+    else:
+        # Handle the empty case - return empty array or default behavior
+        self_scores = np.array([])  # or whatever makes sense for your use case
+
+    thresh = get_thresholds_window(
+        args.eval_model_code, args.eval_dataset, args.score_function
+    )
+    self_window_mask = diff_scores_mask(
+        self_scores,
+        threshold=thresh,
+    )
+
+    # Optionally, save the self-similarity scores to a file
+    save_outputs(
+        self_similarity_scores,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_window",
+    )
+    topk_contents = contents
+    topk_contents = [t for t, m in zip(topk_contents, self_window_mask) if m]
+    return topk_contents
+
+
+def drift_filtering_uniform(
+    args, tokenizer, model, get_emb, question, contents, iter_idx, is_attack_list
+):
+
+    question_top_k_adv_tokenized = tokenizer(
+        [question] + contents,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+    )
+    question_top_k_adv_tokenized = {
+        key: value.cuda() for key, value in question_top_k_adv_tokenized.items()
+    }
+    top_k_adv_tokenized = {
+        key: value[1:] for key, value in question_top_k_adv_tokenized.items()
+    }
+    question_top_k_adv_embedded = get_emb(model, question_top_k_adv_tokenized)
+    question_embed = question_top_k_adv_embedded[0].unsqueeze(0)
+    self_similarity_scores_start = []
+    self_similarity_scores_end = []
+    self_scores = []
+    for i in range(0, len(top_k_adv_tokenized["input_ids"])):
+        # truncating the sentence
+        current_embedded = question_top_k_adv_embedded[i + 1].unsqueeze(0)
+        all_truncated_embeddings = torch.cat(
+            (
+                current_embedded,
+                current_embedded,
+            ),
+            dim=0,
+        )
+        # todo - remove
+        stop = 30
+        current_tokenized = {
+            key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
+        }
+        for j in range(1, stop + 2, stop):  # was stop + 2, stop
+            if torch.sum(current_tokenized["attention_mask"]).item() - 2 <= stop:
+                all_truncated_embeddings = torch.cat(
+                    (
+                        all_truncated_embeddings,
+                        current_embedded,
+                        current_embedded,
+                    ),
+                    dim=0,
+                )
+                continue
+            current_tokenized_truncated_start = get_tokenized_sentence_sliced(
+                current_tokenized,
+                j,
+                "start",
+            )
+            current_embedded_truncated_start = get_emb(
+                model, current_tokenized_truncated_start
+            )
+            current_tokenized_truncated_end = get_tokenized_sentence_sliced(
+                current_tokenized,
+                j,
+                "end",
+            )
+            current_embedded_truncated_end = get_emb(
+                model, current_tokenized_truncated_end
+            )
+            all_truncated_embeddings = torch.cat(
+                (
+                    all_truncated_embeddings,
+                    current_embedded_truncated_start,
+                    current_embedded_truncated_end,
+                ),
+                dim=0,
+            )
+        question_current_embedded = torch.cat((question_embed, current_embedded))
+        if args.score_function == "dot":
+            scores = torch.mm(
+                question_current_embedded,
+                all_truncated_embeddings.T,
+            )
+        elif args.score_function == "cos_sim":
+            scores = cos_similarity(question_current_embedded, all_truncated_embeddings)
+        scores = scores.cpu().detach().numpy().round(4)
+        self_scores.append(scores[1])
+        self_similarity_scores_start.append(
+            (
+                f"top k index: {i+1}",
+                scores[1][0::2],
+                "attack" if is_attack_list[i] else "clean",
+                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
+            )
+        )
+        self_similarity_scores_end.append(
+            (
+                f"top k index: {i+1}",
+                scores[1][1::2],
+                "attack" if is_attack_list[i] else "clean",
+                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
+            )
+        )
+
+    if self_scores:  # Check if list is not empty
+        self_scores = np.vstack(self_scores)
+    else:
+        # Handle the empty case - return empty array or default behavior
+        self_scores = np.array([])  # or whatever makes sense for your use case
+    self_truncated_start_scores = self_scores[:, 0::2]
+    self_truncated_end_scores = self_scores[:, 1::2]
+
+    start_thresh, end_thresh = get_thresholds_truncation(
         args.eval_model_code, args.eval_dataset, args.score_function
     )
     self_truncated_start_mask = diff_scores_mask(
