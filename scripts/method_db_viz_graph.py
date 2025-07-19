@@ -9,12 +9,17 @@ import os
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 from pathlib import Path
 import re
 from typing import List, Dict
 import argparse
+
+# FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json"
+FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_window.json"
+
+# FILES_START = "test_method_"
+FILES_START = "test_method_window20"
 
 
 class SimilarityScoreAnalyzer:
@@ -23,7 +28,7 @@ class SimilarityScoreAnalyzer:
         Initialize the analyzer with base directory.
 
         Args:
-            base_directory: Path to the directory containing test_method_ folders
+            base_directory: Path to the directory containing FILES_START folders
         """
         self.base_directory = Path(base_directory)
         self.data = []
@@ -32,16 +37,14 @@ class SimilarityScoreAnalyzer:
         """Find all folders that might contain experiment data."""
         folders = []
         for folder in self.base_directory.iterdir():
-            if folder.is_dir() and folder.name.startswith("test_method_"):
+            if folder.is_dir() and folder.name.startswith(FILES_START):
                 folders.append(folder)
         return sorted(folders)
 
     def find_similarity_files(self, folder: Path) -> List[Path]:
         """Find all similarity score files in folder and subfolders."""
         similarity_files = []
-        pattern = re.compile(
-            r"sample_\d+_self_similarity_scores_truncated_(start|end)\.json"
-        )
+        pattern = re.compile(FILES_PATTERN)
 
         # Look in all subdirectories recursively
         for root, dirs, files in os.walk(folder):
@@ -54,15 +57,13 @@ class SimilarityScoreAnalyzer:
     def parse_filename(self, filepath: Path) -> Dict[str, str]:
         """Extract information from filename."""
         filename = filepath.name
-        match = re.match(
-            r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json", filename
-        )
+        match = re.match(FILES_PATTERN, filename)
 
         if match:
             folder_info = self._extract_folder_info(filepath)
             return {
                 "sample_number": int(match.group(1)),
-                "truncation_type": match.group(2),
+                # "truncation_type": match.group(2),
                 **folder_info,
             }
         return {}
@@ -222,8 +223,6 @@ class SimilarityScoreAnalyzer:
             group_columns.append("retriever_type")
         if "dataset" in self.df.columns:
             group_columns.append("dataset")
-        # if "truncation_type" in self.df.columns:
-        #     group_columns.append("truncation_type")
 
         # Check if score_function column exists
         if "score_function" not in self.df.columns:
@@ -340,12 +339,6 @@ class SimilarityScoreAnalyzer:
             data[data["attack_type"] == "blackbox_hotflip"]
             if "attack_type" in data.columns
             else data[data["attack_or_clean"] == "blackbox_hotflip"]
-        )
-
-        drift_kmeans_ngram_data = (
-            data[data["removal_method"] == "drift_kmeans_ngram"]
-            if "removal_method" in data.columns
-            else None
         )
 
         # Function to calculate and plot line with std deviation
