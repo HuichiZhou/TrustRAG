@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('nq' 'hotpotqa' 'msmarco' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+datasets=('nq' 'hotpotqa' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
 models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o"
 eval_models_names=("minilm" "mpnet" "roberta") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
 attacks=("hotflip" "blackbox_hotflip") # "none" "LM_targeted" "hotflip" "pia" "aggd" "blackbox_hotflip"
-removals=('drift_window') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram'
+removals=('drift_uniform') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram'
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('cos_sim') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'

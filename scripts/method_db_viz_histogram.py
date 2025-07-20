@@ -16,10 +16,12 @@ from typing import List, Dict
 import argparse
 
 # FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json"
-FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_window.json"
+# FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_window.json"
+FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_uniform.json"
 
 # FILES_START = "test_method_"
-FILES_START = "test_method_window20"
+# FILES_START = "test_method_window20"
+FILES_START = "test_method_uniform"
 
 
 class SimilarityScoreAnalyzer:

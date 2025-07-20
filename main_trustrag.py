@@ -377,7 +377,7 @@ def main():
                                 iter_idx,
                                 is_attack_list,
                             )
-                        elif "random" in args.removal_method:
+                        elif "uniform" in args.removal_method:
                             topk_contents = drift_filtering_uniform(
                                 args,
                                 tokenizer,

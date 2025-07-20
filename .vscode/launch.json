@@ -15,7 +15,7 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=hotpotqa",
-                "--removal_method=drift_window",
+                "--removal_method=drift_uniform",
                 // "--attack_method=LM_targeted",
                 "--attack_method=blackbox_hotflip",
                 // "--attack_method=hotflip",

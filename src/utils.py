@@ -364,3 +364,52 @@ def get_tokenized_sentence_block_removed(tokenized, block_start: int, block_size
         for k in tensors.keys()
     }
     return out
+
+
+def get_tokenized_sentence_uniform(tokenized, rate=0.25):
+    """Remove ``k`` tokens uniformly across the sequence.
+
+    Parameters
+    ----------
+    tokenized : dict
+        Tokenized input containing ``input_ids``, ``token_type_ids`` and
+        ``attention_mask``.
+    k : int
+        Number of tokens to remove.
+
+    Returns
+    -------
+    dict
+        Tokenized input with ``k`` tokens removed uniformly. If ``k`` is
+        larger than the available number of tokens (excluding the special
+        tokens), the original tokenization is returned unchanged.
+    """
+
+    keys = ["input_ids", "token_type_ids", "attention_mask"]
+    valid_token_count = int(tokenized["attention_mask"].sum(dim=1).item())
+    tensors = {
+        k: tokenized[k][:, :valid_token_count] for k in tokenized.keys() if k in keys
+    }
+
+    num_to_remove = int(rate * valid_token_count)
+    if valid_token_count - 2 <= num_to_remove:
+        print(
+            f"Valid token count {valid_token_count} is less than the number of indexes {num_to_remove} to truncate.\nReturning original input."
+        )
+        return tensors
+
+    # Choose positions evenly across the sequence excluding the first/last token
+    remove_positions = (
+        torch.randperm(valid_token_count - 2, device=tensors["input_ids"].device)[
+            :num_to_remove
+        ]
+        + 1
+    )
+
+    mask = torch.ones(
+        valid_token_count, dtype=torch.bool, device=tensors["input_ids"].device
+    )
+    mask[remove_positions] = False
+
+    out = {k: tensors[k][:, mask] for k in tensors.keys() if k in keys}
+    return out

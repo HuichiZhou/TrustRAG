@@ -9,6 +9,7 @@ from .utils import (
     cos_similarity,
     get_tokenized_sentence_block_removed,
     get_tokenized_sentence_sliced,
+    get_tokenized_sentence_uniform,
     progress_bar,
     save_outputs,
 )
@@ -989,7 +990,15 @@ def drift_filtering_sliding_window(
 
 
 def drift_filtering_uniform(
-    args, tokenizer, model, get_emb, question, contents, iter_idx, is_attack_list
+    args,
+    tokenizer,
+    model,
+    get_emb,
+    question,
+    contents,
+    iter_idx,
+    is_attack_list,
+    iterations=10,
 ):
 
     question_top_k_adv_tokenized = tokenizer(
@@ -1006,56 +1015,27 @@ def drift_filtering_uniform(
     }
     question_top_k_adv_embedded = get_emb(model, question_top_k_adv_tokenized)
     question_embed = question_top_k_adv_embedded[0].unsqueeze(0)
-    self_similarity_scores_start = []
-    self_similarity_scores_end = []
+    self_similarity_scores = []
     self_scores = []
     for i in range(0, len(top_k_adv_tokenized["input_ids"])):
         # truncating the sentence
         current_embedded = question_top_k_adv_embedded[i + 1].unsqueeze(0)
         all_truncated_embeddings = torch.cat(
-            (
-                current_embedded,
-                current_embedded,
-            ),
+            [current_embedded],
             dim=0,
         )
-        # todo - remove
-        stop = 30
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
-        for j in range(1, stop + 2, stop):  # was stop + 2, stop
-            if torch.sum(current_tokenized["attention_mask"]).item() - 2 <= stop:
-                all_truncated_embeddings = torch.cat(
-                    (
-                        all_truncated_embeddings,
-                        current_embedded,
-                        current_embedded,
-                    ),
-                    dim=0,
-                )
-                continue
-            current_tokenized_truncated_start = get_tokenized_sentence_sliced(
+        for _ in range(1, iterations):  # was stop + 2, stop
+            current_tokenized_truncated_start = get_tokenized_sentence_uniform(
                 current_tokenized,
-                j,
-                "start",
             )
-            current_embedded_truncated_start = get_emb(
-                model, current_tokenized_truncated_start
-            )
-            current_tokenized_truncated_end = get_tokenized_sentence_sliced(
-                current_tokenized,
-                j,
-                "end",
-            )
-            current_embedded_truncated_end = get_emb(
-                model, current_tokenized_truncated_end
-            )
+            current_embedded_uniform = get_emb(model, current_tokenized_truncated_start)
             all_truncated_embeddings = torch.cat(
                 (
                     all_truncated_embeddings,
-                    current_embedded_truncated_start,
-                    current_embedded_truncated_end,
+                    current_embedded_uniform,
                 ),
                 dim=0,
             )
@@ -1069,56 +1049,34 @@ def drift_filtering_uniform(
             scores = cos_similarity(question_current_embedded, all_truncated_embeddings)
         scores = scores.cpu().detach().numpy().round(4)
         self_scores.append(scores[1])
-        self_similarity_scores_start.append(
+        self_similarity_scores.append(
             (
                 f"top k index: {i+1}",
-                scores[1][0::2],
+                scores[1],
                 "attack" if is_attack_list[i] else "clean",
                 f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
             )
         )
-        self_similarity_scores_end.append(
-            (
-                f"top k index: {i+1}",
-                scores[1][1::2],
-                "attack" if is_attack_list[i] else "clean",
-                f"token length: {torch.sum(current_tokenized['attention_mask']).item()}",
-            )
-        )
-
     if self_scores:  # Check if list is not empty
         self_scores = np.vstack(self_scores)
     else:
         # Handle the empty case - return empty array or default behavior
         self_scores = np.array([])  # or whatever makes sense for your use case
-    self_truncated_start_scores = self_scores[:, 0::2]
-    self_truncated_end_scores = self_scores[:, 1::2]
 
-    start_thresh, end_thresh = get_thresholds_truncation(
+    thresh = get_thresholds_window(
         args.eval_model_code, args.eval_dataset, args.score_function
     )
-    self_truncated_start_mask = diff_scores_mask(
-        self_truncated_start_scores,
-        threshold=start_thresh,
-    )
-    self_truncated_end_mask = diff_scores_mask(
-        self_truncated_end_scores, threshold=end_thresh
-    )
+
+    self_mask = diff_scores_mask(self_scores, threshold=thresh)
 
     # Optionally, save the self-similarity scores to a file
     save_outputs(
-        self_similarity_scores_start,
+        self_similarity_scores,
         args.log_name,
-        f"sample_{iter_idx}_self_similarity_scores_truncated_start",
-    )
-    save_outputs(
-        self_similarity_scores_end,
-        args.log_name,
-        f"sample_{iter_idx}_self_similarity_scores_truncated_end",
+        f"sample_{iter_idx}_self_similarity_scores_uniform",
     )
     topk_contents = contents
-    combined_mask = self_truncated_start_mask & self_truncated_end_mask
-    topk_contents = [t for t, m in zip(topk_contents, combined_mask) if m]
+    topk_contents = [t for t, m in zip(topk_contents, self_mask) if m]
     return topk_contents
 
 
