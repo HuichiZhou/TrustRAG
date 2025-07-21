@@ -21,7 +21,8 @@ FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_uniform.json"
 
 # FILES_START = "test_method_"
 # FILES_START = "test_method_window20"
-FILES_START = "test_method_uniform"
+# FILES_START = "test_method_uniform"
+FILES_START = "test_method_25uniform"
 
 
 class SimilarityScoreAnalyzer:

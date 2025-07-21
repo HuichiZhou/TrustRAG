@@ -998,7 +998,7 @@ def drift_filtering_uniform(
     contents,
     iter_idx,
     is_attack_list,
-    iterations=10,
+    iterations=20,
 ):
 
     question_top_k_adv_tokenized = tokenizer(

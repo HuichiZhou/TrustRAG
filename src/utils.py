@@ -366,7 +366,7 @@ def get_tokenized_sentence_block_removed(tokenized, block_start: int, block_size
     return out
 
 
-def get_tokenized_sentence_uniform(tokenized, rate=0.25):
+def get_tokenized_sentence_uniform(tokenized, rate=0.15):
     """Remove ``k`` tokens uniformly across the sequence.
 
     Parameters
