@@ -108,7 +108,7 @@ def parse_args():
         default=10,
         help="one of our parameters, the number of target queries",
     )
-    parser.add_argument("--seed", type=int, default=12, help="Random seed")
+    parser.add_argument("--seed", type=int, default=13, help="Random seed")
     parser.add_argument("--log_name", type=str, help="Name of log and result.")
     parser.add_argument(
         "--removal_method",
@@ -130,6 +130,10 @@ def parse_args():
         type=str,
         default="conflict",
         choices=["none", "conflict", "astute", "instruct"],
+    )
+    parser.add_argument(
+        "--use_cache",
+        action="store_true",
     )
     parser.add_argument(
         "--llm_flag",

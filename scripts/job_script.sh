@@ -34,13 +34,18 @@ repeat_times=10
 M=10                            # number of queries
 split="test"
 top_k=5
-llm_flag=true
+cache_flag=true
+cache_arg=""
+if $cache_flag; then
+    cache_arg="--use_cache"
+fi
+llm_flag=false
 llm_arg=""
 if $llm_flag; then
     llm_arg="--llm_flag"
 fi
 # Don't forget to change back
-log_name="test_method_20_15uniform_dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-Top_${top_k}-Seed_${seed}_both_combined"
+log_name="${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-Top_${top_k}-Seed_${seed}_both_combined"
 
 huggingface-cli whoami
 # Run the Python script with the parameters passed from the environment
@@ -62,5 +67,6 @@ python3 -u main_trustrag.py \
         --M "$M" \
         --seed "$seed" \
         --log_name "$log_name" \
+        $cache_arg \
         $llm_arg 
 

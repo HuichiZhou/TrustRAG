@@ -3,6 +3,8 @@ import torch
 import random
 from src.utils import cos_similarity, load_json, progress_bar
 from loguru import logger
+import os
+import json
 
 
 class GradientStorage:
@@ -61,21 +63,66 @@ class Attacker:
         )
         logger.info(f"Initializing attacker with method: {args.attack_method}")
 
+    def _get_cache_path(self):
+        model_name = getattr(self.args, "eval_model_code", str(type(self.model)))
+        cache_dir = "results/adv_cache"
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = f"{cache_dir}/cache_{self.attack_method}_{self.adv_a_position}_{model_name.replace('/', '_')}.json"
+        return cache_file
+
+    def _load_cache(self):
+        cache_file = self._get_cache_path()
+        if os.path.exists(cache_file):
+            with open(cache_file, "r") as f:
+                return json.load(f)
+        return {}
+
+    def _save_cache(self, cache):
+        cache_file = self._get_cache_path()
+        with open(cache_file, "w") as f:
+            json.dump(cache, f)
+
     def get_attack(self, target_queries) -> list:
         """
-        This function returns adv_text_groups, which contains adv_texts for M queries
-        For each query, if adv_per_query>1, we use different generated adv_texts or copies of the same adv_text
+        Returns adv_text_groups, using cache if enabled.
         """
-        if self.attack_method == "LM_targeted":
-            adv_text_groups = self.pia(target_queries)
-        elif "hotflip" in self.attack_method:
-            adv_text_groups = self.hotflip(
-                target_queries,
-            )
-        elif self.attack_method == "aggd":
-            adv_text_groups = self.aggd(target_queries)
-        else:
-            raise NotImplementedError
+        use_cache = getattr(self.args, "use_cache", False)
+        cache = self._load_cache() if use_cache else {}
+
+        adv_text_groups = []
+        cache_updated = False
+
+        for query in target_queries:
+            qid = query["id"]
+            adv_texts = cache.get(str(qid), [])
+
+            # If not enough cached adv_texts, generate missing
+            if len(adv_texts) < self.adv_per_query:
+                logger.info(
+                    f"{qid} - Missing cached adv texts for query, generating {self.adv_per_query} more"
+                )
+                # Generate missing adv_texts using the attack method
+                if self.attack_method == "LM_targeted":
+                    new_texts = self.pia([query])[len(adv_texts) :]
+                elif "hotflip" in self.attack_method:
+                    new_texts = self.hotflip([query])[len(adv_texts) :]
+                elif self.attack_method == "aggd":
+                    new_texts = self.aggd([query])[len(adv_texts) :]
+                else:
+                    raise NotImplementedError
+                # Flatten if needed
+                if isinstance(new_texts[0], list):
+                    new_texts = new_texts[0]
+                adv_texts.extend(new_texts)
+                cache[str(qid)] = adv_texts[: self.adv_per_query]
+                cache_updated = True
+            else:
+                logger.info(f"{qid} - fully cached adv texts for query")
+            adv_text_groups.append(adv_texts[: self.adv_per_query])
+
+        if use_cache and cache_updated:
+            self._save_cache(cache)
+
         return adv_text_groups
 
     def pia(self, target_queries):
