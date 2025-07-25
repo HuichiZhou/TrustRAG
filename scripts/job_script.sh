@@ -4,7 +4,7 @@
 #SBATCH --error=logs/job_%j.txt      # Standard error
 #SBATCH --ntasks=1                     # Number of tasks
 #SBATCH -c 8                      # number of cores (treats)
-#SBATCH --gres=gpu:A40:1
+#SBATCH --gres=gpu:L40:1
 #SBATCH --mail-user=tom.rahav@campus.technion.ac.il
 #SBATCH --mail-type=NONE                # Send email on all events
 
@@ -20,15 +20,15 @@ query_results_dir="main"
 note=""
 
 # Set parameters
-DATASET="${DATASET:-hotpotqa}"           # ['nq','hotpotqa', 'msmarco']
+DATASET="${DATASET:-nq}"           # ['nq','hotpotqa', 'msmarco']
 MODEL_NAME="${MODEL_NAME:-mistralai/Mistral-Nemo-Instruct-2407}"
 EVAL_MODEL_CODE="${EVAL_MODEL_CODE:-contriever}" # ['contriever', 'contriever-ms', 'ance']
 ATTACK="${ATTACK:-hotflip}"    # ['none', 'LM_targeted', 'hotflip', 'pia']
 DEFENSE="${DEFENSE:-none}"       # ['none', 'conflict', 'astute', 'instruct']
-REMOVAL="${REMOVAL:-none}"          # ['none', 'kmeans', 'kmeans_ngram']
+REMOVAL="${REMOVAL:-drift_uniform}"          # ['none', 'kmeans', 'kmeans_ngram']
 SCORE="${SCORE:-dot}"
-ADV_A_POSITION="${ADV_A_POSITION:-end}" # ['start', 'end']
-ADV_PER_QUERY="${ADV_PER_QUERY:-3}" # number of adversarial queries per query
+ADV_A_POSITION="${ADV_A_POSITION:-start}" # ['start', 'end']
+ADV_PER_QUERY="${ADV_PER_QUERY:-5}" # number of adversarial queries per query
 NUM_TOKENS_TO_REMOVE="${NUM_TOKENS_TO_REMOVE:-30}" # number of tokens to remove from the query
 
 repeat_times=10
