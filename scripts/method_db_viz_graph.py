@@ -15,36 +15,51 @@ import re
 from typing import List, Dict
 import argparse
 
-# FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json"
-FILES_PATTERN = r"sample_(\d+)_self_similarity_scores_window.json"
-
-# FILES_START = "test_method_"
-FILES_START = "test_method_window20"
+DRIFT_OPTIONS = {
+    "truncation": {
+        "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json",
+        "FILES_START": "test_method_",
+    },
+    "window": {
+        "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_window.json",
+        "FILES_START": "test_method_window",
+    },
+    "uniform": {
+        "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_uniform.json",
+        "FILES_START": "test_method_uniform",
+    },
+}
 
 
 class SimilarityScoreAnalyzer:
-    def __init__(self, base_directory: str):
+    def __init__(self, base_directory: str, drift: str):
         """
         Initialize the analyzer with base directory.
 
         Args:
             base_directory: Path to the directory containing FILES_START folders
         """
+        drift_config = DRIFT_OPTIONS[drift]
+        files_pattern = drift_config["FILES_PATTERN"]
+        files_start = drift_config["FILES_START"]
+        self.drift = drift
         self.base_directory = Path(base_directory)
+        self.files_pattern = files_pattern
+        self.files_start = files_start
         self.data = []
 
     def find_test_method_folders(self) -> List[Path]:
         """Find all folders that might contain experiment data."""
         folders = []
         for folder in self.base_directory.iterdir():
-            if folder.is_dir() and folder.name.startswith(FILES_START):
+            if folder.is_dir() and folder.name.startswith(self.files_start):
                 folders.append(folder)
         return sorted(folders)
 
     def find_similarity_files(self, folder: Path) -> List[Path]:
         """Find all similarity score files in folder and subfolders."""
         similarity_files = []
-        pattern = re.compile(FILES_PATTERN)
+        pattern = re.compile(self.files_pattern)
 
         # Look in all subdirectories recursively
         for root, dirs, files in os.walk(folder):
@@ -57,7 +72,7 @@ class SimilarityScoreAnalyzer:
     def parse_filename(self, filepath: Path) -> Dict[str, str]:
         """Extract information from filename."""
         filename = filepath.name
-        match = re.match(FILES_PATTERN, filename)
+        match = re.match(self.files_pattern, filename)
 
         if match:
             folder_info = self._extract_folder_info(filepath)
@@ -77,28 +92,24 @@ class SimilarityScoreAnalyzer:
         retriever_type = "unknown"
         attack_type = "unknown"
         score_function = "unknown"
+        num_tokens_removed = None
 
         # Look through all path parts to extract information
         for part in parts:
             part_lower = part.lower()
 
             # Extract attack type (aggd or hotflip)
-            for at in ["aggd", "hotflip"]:
+            for at in ["aggd", "hotflip", "blackbox_hotflip"]:
                 if at in part_lower:
                     attack_type = at
                     break
 
-            # Extract common dataset names (you may need to adjust these)
-            for dataset_name in [
-                "msmarco",
-                "nq",
-                "mirage",
-                "hotpotqa",
-            ]:
+            # Extract common dataset names
+            for dataset_name in ["msmarco", "nq", "mirage", "hotpotqa"]:
                 if dataset_name in part_lower:
                     dataset = dataset_name
 
-            # Extract retriever types (you may need to adjust these)
+            # Extract retriever types
             for retriever in [
                 "contriever",
                 "contriever-ms",
@@ -115,11 +126,17 @@ class SimilarityScoreAnalyzer:
                     score_function = score
                     break
 
+            # Extract num_tokens_removed from folder name
+            match = re.search(r"num_tokens_removed_(\d+)", part_lower)
+            if match:
+                num_tokens_removed = int(match.group(1))
+
         return {
             "dataset": dataset,
             "retriever_type": retriever_type,
             "attack_type": attack_type,
             "score_function": score_function,
+            "num_tokens_removed": num_tokens_removed,
         }
 
     def parse_token_length(self, token_info: str) -> int:
@@ -289,7 +306,9 @@ class SimilarityScoreAnalyzer:
 
             # Add overall title for the score function
             fig.suptitle(
-                f"Attack Comparison - Score Function: {score_func}", fontsize=16, y=0.98
+                f"Attack Comparison - Score Function: {score_func} - Drift: {self.drift}",
+                fontsize=16,
+                y=0.98,
             )
 
             plt.tight_layout()
@@ -302,7 +321,9 @@ class SimilarityScoreAnalyzer:
                     .replace(" ", "_")
                     .replace(".", "_")
                 )
-                filename = f"plots/attack_comparison_{score_func_clean}.png"
+                filename = (
+                    f"plots/attack_comparison_{score_func_clean}_{self.drift}.png"
+                )
                 plt.savefig(filename, dpi=300, bbox_inches="tight")
                 print(f"Saved attack comparison plots as '{filename}'")
 
@@ -312,7 +333,9 @@ class SimilarityScoreAnalyzer:
         self, data, group_name, save_individual=False, ax=None
     ):
         """
-        Create a single comparison plot for clean vs hotflip vs aggd.
+        Create a comparison plot for clean vs hotflip vs aggd.
+        For truncation: x-axis is the index in the similarity list (tokens removed).
+        For window/uniform: x-axis is num_tokens_removed from folder info.
         """
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 6))
@@ -321,78 +344,105 @@ class SimilarityScoreAnalyzer:
             "clean": "#2E8B57",  # Sea Green
             "hotflip": "#DC143C",  # Crimson
             "aggd": "#4169E1",  # Royal Blue
+            "blackbox_hotflip": "orange",
         }
 
         # Separate data by type
-        clean_data = data[data["attack_or_clean"] == "clean"]
-        hotflip_data = (
-            data[data["attack_type"] == "hotflip"]
-            if "attack_type" in data.columns
-            else data[data["attack_or_clean"] == "hotflip"]
-        )
-        aggd_data = (
-            data[data["attack_type"] == "aggd"]
-            if "attack_type" in data.columns
-            else data[data["attack_or_clean"] == "aggd"]
-        )
-        blackbox_hotflip_data = (
-            data[data["attack_type"] == "blackbox_hotflip"]
-            if "attack_type" in data.columns
-            else data[data["attack_or_clean"] == "blackbox_hotflip"]
-        )
+        attack_types = [
+            ("Clean", data[data["attack_or_clean"] == "clean"], colors["clean"]),
+            (
+                "HotFlip",
+                data[data.get("attack_type", data["attack_or_clean"]) == "hotflip"],
+                colors["hotflip"],
+            ),
+            (
+                "AGGD",
+                data[data.get("attack_type", data["attack_or_clean"]) == "aggd"],
+                colors["aggd"],
+            ),
+            (
+                "Blackbox HotFlip",
+                data[
+                    data.get("attack_type", data["attack_or_clean"])
+                    == "blackbox_hotflip"
+                ],
+                colors["blackbox_hotflip"],
+            ),
+        ]
 
-        # Function to calculate and plot line with std deviation
-        def plot_attack_line(attack_data, label, color):
-            if attack_data is None or attack_data.empty:
-                print(f"Warning: No data found for {label} in group {group_name}")
-                return
+        if self.drift == "truncation":
+            # Plot as before: x = index in similarity_values
+            for label, d, color in attack_types:
+                if d.empty:
+                    continue
+                sim_vals = np.array(d["similarity_values"].tolist())
+                if sim_vals.size == 0:
+                    continue
+                max_len = max(len(vals) for vals in d["similarity_values"])
+                x_values = np.arange(max_len)
+                # Pad with nan for unequal lengths
+                sim_vals_padded = np.full((len(sim_vals), max_len), np.nan)
+                for i, row in enumerate(sim_vals):
+                    sim_vals_padded[i, : len(row)] = row
+                y_values = np.nanmean(sim_vals_padded, axis=0)
+                y_stds = np.nanstd(sim_vals_padded, axis=0)
+                ax.plot(
+                    x_values, y_values, color=color, linewidth=2, label=label, alpha=0.8
+                )
+                ax.fill_between(
+                    x_values,
+                    y_values - y_stds,
+                    y_values + y_stds,
+                    color=color,
+                    alpha=0.2,
+                )
+            ax.set_xlabel("Number of Removed Tokens")
+            ax.set_ylabel("Mean Similarity Score")
+        else:
+            # For window/uniform: x = num_tokens_removed, y = final similarity value
+            for label, d, color in attack_types:
+                if d.empty or "num_tokens_removed" not in d.columns:
+                    continue
+                # Group by num_tokens_removed, aggregate final_similarity
+                grouped = d.groupby("num_tokens_removed")["final_similarity"]
+                x = []
+                y = []
+                yerr = []
+                for num_removed, vals in grouped:
+                    x.append(num_removed)
+                    y.append(np.mean(vals))
+                    yerr.append(np.std(vals))
+                if not x:
+                    continue
+                x = np.array(x)
+                y = np.array(y)
+                yerr = np.array(yerr)
+                sort_idx = np.argsort(x)
+                ax.errorbar(
+                    x[sort_idx],
+                    y[sort_idx],
+                    yerr=yerr[sort_idx],
+                    fmt="-o",
+                    color=color,
+                    label=label,
+                    alpha=0.8,
+                )
+            ax.set_xlabel("Number of Tokens Removed")
+            ax.set_ylabel("Final Similarity Score")
 
-            max_len = max(
-                [len(vals) for vals in attack_data["similarity_values"]] + [0]
-            )
-            if max_len == 0:
-                return
-            sim_vals = np.array(attack_data["similarity_values"].tolist())
-
-            x_values = range(max_len)
-            y_values = np.mean(sim_vals, axis=0)
-            y_stds = np.std(sim_vals, axis=0)
-            ax.plot(
-                x_values, y_values, color=color, linewidth=2, label=label, alpha=0.8
-            )
-            ax.fill_between(
-                x_values,
-                np.array(y_values) - y_stds,
-                np.array(y_values) + y_stds,
-                color=color,
-                alpha=0.2,
-            )
-
-        # Plot each attack type
-        plot_attack_line(clean_data, "Clean", colors["clean"])
-        plot_attack_line(hotflip_data, "HotFlip", colors["hotflip"])
-        plot_attack_line(aggd_data, "AGGD", colors["aggd"])
-        plot_attack_line(blackbox_hotflip_data, "Blackbox HotFlip Attack", "orange")
-
-        # Customize plot
-        ax.set_xlabel("Number of Removed Tokens")
-        ax.set_ylabel("Mean Similarity Score")
-        ax.set_title(f"Attack Comparison: {group_name}")
+        ax.set_title(f"Attack Comparison: {group_name} - Drift: {self.drift}")
         ax.legend()
         ax.grid(True, alpha=0.3)
-
-        # Set y-axis limits for better visualization
-        # ax.set_ylim(0, 1)
 
         if save_individual:
             group_name_clean = str(group_name).replace("/", "_").replace(" ", "_")
             plt.savefig(
-                f"attack_comparison_{group_name_clean}.png",
+                f"attack_comparison_{group_name_clean}_{self.drift}.png",
                 dpi=300,
                 bbox_inches="tight",
             )
             print(
-                f"Saved individual plot as 'attack_comparison_{group_name_clean}.png'"
+                f"Saved individual plot as 'attack_comparison_{group_name_clean}_{self.drift}.png'"
             )
 
     def create_comprehensive_attack_analysis(self, save_plots: bool = True):
@@ -464,11 +514,17 @@ def main():
     parser.add_argument(
         "--save-plots", action="store_true", default=True, help="Save plots to files"
     )
+    parser.add_argument(
+        "--drift",
+        choices=["truncation", "window", "uniform"],
+        default="window",
+        help="Drift method to analyze (truncation, window, uniform)",
+    )
 
     args = parser.parse_args()
 
     # Initialize analyzer
-    analyzer = SimilarityScoreAnalyzer(args.directory)
+    analyzer = SimilarityScoreAnalyzer(args.directory, args.drift)
 
     # Process all files
     print("Processing similarity score files...")
@@ -483,7 +539,7 @@ def main():
         analyzer.create_comprehensive_attack_analysis(save_plots=args.save_plots)
 
     # Optionally save processed data
-    output_file = "processed_similarity_data.csv"
+    output_file = f"processed_similarity_data_{args.drift}.csv"
     df.to_csv(output_file, index=False)
     print(f"\nProcessed data saved to: {output_file}")
 
