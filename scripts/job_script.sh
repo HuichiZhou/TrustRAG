@@ -4,7 +4,7 @@
 #SBATCH --error=logs/job_%j.txt      # Standard error
 #SBATCH --ntasks=1                     # Number of tasks
 #SBATCH -c 8                      # number of cores (treats)
-#SBATCH --gres=gpu:L40:1
+#SBATCH --gres=gpu:A40:1
 #SBATCH --mail-user=tom.rahav@campus.technion.ac.il
 #SBATCH --mail-type=NONE                # Send email on all events
 

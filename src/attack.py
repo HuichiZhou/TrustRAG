@@ -64,10 +64,13 @@ class Attacker:
         logger.info(f"Initializing attacker with method: {args.attack_method}")
 
     def _get_cache_path(self):
-        model_name = getattr(self.args, "eval_model_code", str(type(self.model)))
+        model_name = getattr(
+            self.args, "eval_model_code", str(type(self.model)).replace("/", "_")
+        )
+        dataset_name = getattr(self.args, "eval_dataset")
         cache_dir = "results/adv_cache"
         os.makedirs(cache_dir, exist_ok=True)
-        cache_file = f"{cache_dir}/cache_{self.attack_method}_{self.adv_a_position}_{model_name.replace('/', '_')}.json"
+        cache_file = f"{cache_dir}/cache_{dataset_name}_{model_name}_{self.attack_method}_{self.adv_a_position}.json"
         return cache_file
 
     def _load_cache(self):
