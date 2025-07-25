@@ -733,7 +733,15 @@ def get_thresholds_window(model_code, dataset, score_function, percentile=95):
 
 
 def drift_filtering_truncation(
-    args, tokenizer, model, get_emb, question, contents, iter_idx, is_attack_list
+    args,
+    tokenizer,
+    model,
+    get_emb,
+    question,
+    contents,
+    iter_idx,
+    num_tokens_to_remove,
+    is_attack_list,
 ):
 
     question_top_k_adv_tokenized = tokenizer(
@@ -764,12 +772,16 @@ def drift_filtering_truncation(
             dim=0,
         )
         # todo - remove
-        stop = 30
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
-        for j in range(1, stop + 2, stop):  # was stop + 2, stop
-            if torch.sum(current_tokenized["attention_mask"]).item() - 2 <= stop:
+        for j in range(
+            1, num_tokens_to_remove + 2, num_tokens_to_remove
+        ):  # was stop + 2, stop
+            if (
+                torch.sum(current_tokenized["attention_mask"]).item() - 2
+                <= num_tokens_to_remove
+            ):
                 all_truncated_embeddings = torch.cat(
                     (
                         all_truncated_embeddings,
@@ -874,8 +886,8 @@ def drift_filtering_sliding_window(
     question,
     contents,
     iter_idx,
+    window_size,
     is_attack_list,
-    window_size=20,
 ):
     question_top_k_adv_tokenized = tokenizer(
         [question] + contents,
@@ -998,6 +1010,7 @@ def drift_filtering_uniform(
     contents,
     iter_idx,
     is_attack_list,
+    num_tokens_to_remove,
     iterations=20,
 ):
 
@@ -1027,9 +1040,9 @@ def drift_filtering_uniform(
         current_tokenized = {
             key: value[i].unsqueeze(0) for key, value in top_k_adv_tokenized.items()
         }
-        for _ in range(1, iterations):  # was stop + 2, stop
+        for _ in range(1, iterations):
             current_tokenized_truncated_start = get_tokenized_sentence_uniform(
-                current_tokenized,
+                current_tokenized, num_tokens_to_remove
             )
             current_embedded_uniform = get_emb(model, current_tokenized_truncated_start)
             all_truncated_embeddings = torch.cat(

@@ -109,6 +109,7 @@ def parse_args():
         help="one of our parameters, the number of target queries",
     )
     parser.add_argument("--seed", type=int, default=13, help="Random seed")
+    parser.add_argument("--num_tokens_to_remove", "-ntr", type=int, default=30)
     parser.add_argument("--log_name", type=str, help="Name of log and result.")
     parser.add_argument(
         "--removal_method",
@@ -379,6 +380,7 @@ def main():
                                 question,
                                 topk_contents,
                                 iter_idx,
+                                args.num_tokens_to_remove,
                                 is_attack_list,
                             )
                         elif "uniform" in args.removal_method:
@@ -390,6 +392,7 @@ def main():
                                 question,
                                 topk_contents,
                                 iter_idx,
+                                args.num_tokens_to_remove,
                                 is_attack_list,
                             )
                         else:
@@ -401,6 +404,7 @@ def main():
                                 question,
                                 topk_contents,
                                 iter_idx,
+                                args.num_tokens_to_remove,
                                 is_attack_list,
                             )
             if args.removal_method == "all":
