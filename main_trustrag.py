@@ -379,7 +379,7 @@ def main():
                                 get_emb,
                                 question,
                                 topk_contents,
-                                iter_idx,
+                                i,
                                 args.num_tokens_to_remove,
                                 is_attack_list,
                             )
@@ -391,7 +391,7 @@ def main():
                                 get_emb,
                                 question,
                                 topk_contents,
-                                iter_idx,
+                                i,
                                 args.num_tokens_to_remove,
                                 is_attack_list,
                             )
@@ -403,7 +403,7 @@ def main():
                                 get_emb,
                                 question,
                                 topk_contents,
-                                iter_idx,
+                                i,
                                 args.num_tokens_to_remove,
                                 is_attack_list,
                             )

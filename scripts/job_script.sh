@@ -21,7 +21,7 @@ note=""
 
 # Set parameters
 DATASET="${DATASET:-nq}"           # ['nq','hotpotqa', 'msmarco']
-MODEL_NAME="${MODEL_NAME:-mistralai/Mistral-Nemo-Instruct-2407}"
+MODEL_NAME="${MODEL_NAME:-meta-llama/Llama-3.1-8B-Instruct}"
 EVAL_MODEL_CODE="${EVAL_MODEL_CODE:-contriever}" # ['contriever', 'contriever-ms', 'ance']
 ATTACK="${ATTACK:-hotflip}"    # ['none', 'LM_targeted', 'hotflip', 'pia']
 DEFENSE="${DEFENSE:-none}"       # ['none', 'conflict', 'astute', 'instruct']
@@ -46,7 +46,7 @@ if $llm_flag; then
     llm_arg="--llm_flag"
 fi
 # Don't forget to change back
-log_name="${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${note}"
+log_name="${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${NUM_TOKENS_TO_REMOVE}"
 
 huggingface-cli whoami
 # Run the Python script with the parameters passed from the environment

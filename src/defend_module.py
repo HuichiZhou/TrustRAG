@@ -1009,8 +1009,8 @@ def drift_filtering_uniform(
     question,
     contents,
     iter_idx,
-    is_attack_list,
     num_tokens_to_remove,
+    is_attack_list,
     iterations=20,
 ):
 
