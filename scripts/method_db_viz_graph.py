@@ -18,17 +18,16 @@ import argparse
 DRIFT_OPTIONS = {
     "truncation": {
         "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_truncated_(start|end)\.json",
-        "FILES_START": "test_method_",
     },
     "window": {
         "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_window.json",
-        "FILES_START": "test_method_window",
     },
     "uniform": {
         "FILES_PATTERN": r"sample_(\d+)_self_similarity_scores_uniform.json",
-        "FILES_START": "test_method_uniform",
     },
 }
+
+FILES_START = "test_method_"
 
 
 class SimilarityScoreAnalyzer:
@@ -41,7 +40,7 @@ class SimilarityScoreAnalyzer:
         """
         drift_config = DRIFT_OPTIONS[drift]
         files_pattern = drift_config["FILES_PATTERN"]
-        files_start = drift_config["FILES_START"]
+        files_start = FILES_START
         self.drift = drift
         self.base_directory = Path(base_directory)
         self.files_pattern = files_pattern
@@ -283,7 +282,7 @@ class SimilarityScoreAnalyzer:
 
             # Handle different subplot configurations
             if n_groups == 1:
-                axes = [axes]
+                axes = np.array([axes])
             elif n_rows == 1:
                 axes = axes.reshape(1, -1)
             axes = axes.flatten()

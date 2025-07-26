@@ -27,7 +27,7 @@ ATTACK="${ATTACK:-hotflip}"    # ['none', 'LM_targeted', 'hotflip', 'pia']
 DEFENSE="${DEFENSE:-none}"       # ['none', 'conflict', 'astute', 'instruct']
 REMOVAL="${REMOVAL:-drift_uniform}"          # ['none', 'kmeans', 'kmeans_ngram']
 SCORE="${SCORE:-dot}"
-ADV_A_POSITION="${ADV_A_POSITION:-start}" # ['start', 'end']
+ADV_A_POSITION="${ADV_A_POSITION:-end}" # ['start', 'end']
 ADV_PER_QUERY="${ADV_PER_QUERY:-5}" # number of adversarial queries per query
 NUM_TOKENS_TO_REMOVE="${NUM_TOKENS_TO_REMOVE:-30}" # number of tokens to remove from the query
 
@@ -46,7 +46,7 @@ if $llm_flag; then
     llm_arg="--llm_flag"
 fi
 # Don't forget to change back
-log_name="${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${NUM_TOKENS_TO_REMOVE}"
+log_name="dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${NUM_TOKENS_TO_REMOVE}"
 
 huggingface-cli whoami
 # Run the Python script with the parameters passed from the environment
