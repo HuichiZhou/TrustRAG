@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('nq') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+datasets=('nq' 'hotpotqa' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
 models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o"
-eval_models_names=("contriever" "contriever-ms") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
-attacks=("hotflip") # "none" "LM_targeted" "hotflip" "pia" "aggd" "blackbox_hotflip"
-removals=('none') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram'
+eval_models_names=("contriever" "contriever-ms" "ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
+attacks=("hotflip" "aggd" "blackbox_hotflip") # "none" "LM_targeted" "hotflip" "pia" "aggd" "blackbox_hotflip"
+removals=('drift_uniform' 'drift_window') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram'
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('dot') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'
 advs_per_query=(5)
-num_tokens_to_remove=(30) # 5 10 15 20 25 30 35 40
+num_tokens_to_remove=(0 5 10 15 20 25 30 35 40) # 0 5 10 15 20 25 30 35 40
 
 
 index=1  # Initialize counter

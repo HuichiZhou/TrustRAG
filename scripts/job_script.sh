@@ -46,7 +46,7 @@ if $llm_flag; then
     llm_arg="--llm_flag"
 fi
 # Don't forget to change back
-log_name="dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${NUM_TOKENS_TO_REMOVE}"
+log_name="test_method_dataset_${DATASET}-retriver_${EVAL_MODEL_CODE}-model_${llm_flag}_${MODEL_NAME}-M${M}xRepeat${repeat_times}-attack_${ATTACK}-removal_${REMOVAL}-defend_${DEFENSE}-${SCORE}-adv_per_query${ADV_PER_QUERY}-adv_a_position_${ADV_A_POSITION}-top_${top_k}-seed_${seed}-num_tokens_removed_${NUM_TOKENS_TO_REMOVE}"
 
 huggingface-cli whoami
 # Run the Python script with the parameters passed from the environment
