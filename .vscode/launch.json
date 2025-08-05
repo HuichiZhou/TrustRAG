@@ -15,7 +15,7 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
-                "--removal_method=drift",
+                "--removal_method=perplexity",
                 // "--attack_method=LM_targeted",
                 // "--attack_method=blackbox_hotflip",
                 "--attack_method=hotflip",
@@ -44,7 +44,21 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "args": [
-                "--drift=uniform",
+                "--drift=truncation",
+            ]
+        },
+        {
+            "name": "Threshold with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "/home/tom.rahav/miniconda3/envs/trustrag/bin/python",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "args": [
+                "--method=perplexity",
+                "--eval_dataset=nq",
+                "--eval_model_code=contriever",
             ]
         },
         {

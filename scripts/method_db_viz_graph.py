@@ -98,7 +98,7 @@ class SimilarityScoreAnalyzer:
             part_lower = part.lower()
 
             # Extract attack type (aggd or hotflip)
-            for at in ["aggd", "hotflip", "blackbox_hotflip"]:
+            for at in ["aggd", "blackbox_hotflip", "hotflip"]:
                 if at in part_lower:
                     attack_type = at
                     break
@@ -343,7 +343,7 @@ class SimilarityScoreAnalyzer:
             "clean": "#2E8B57",  # Sea Green
             "hotflip": "#DC143C",  # Crimson
             "aggd": "#4169E1",  # Royal Blue
-            "blackbox_hotflip": "orange",
+            "blackbox_hotflip": "#DCD514",  # Crimson
         }
 
         # Separate data by type
@@ -417,14 +417,23 @@ class SimilarityScoreAnalyzer:
                 y = np.array(y)
                 yerr = np.array(yerr)
                 sort_idx = np.argsort(x)
-                ax.errorbar(
-                    x[sort_idx],
-                    y[sort_idx],
-                    yerr=yerr[sort_idx],
-                    fmt="-o",
+                x_sorted = x[sort_idx]
+                y_sorted = y[sort_idx]
+                yerr_sorted = yerr[sort_idx]
+                ax.plot(
+                    x_sorted,
+                    y_sorted,
                     color=color,
+                    linewidth=2,
                     label=label,
                     alpha=0.8,
+                )
+                ax.fill_between(
+                    x_sorted,
+                    y_sorted - yerr_sorted,
+                    y_sorted + yerr_sorted,
+                    color=color,
+                    alpha=0.2,
                 )
             ax.set_xlabel("Number of Tokens Removed")
             ax.set_ylabel("Final Similarity Score")

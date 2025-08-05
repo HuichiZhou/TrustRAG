@@ -281,6 +281,96 @@ def k_mean_filtering(embedding_tokenizer, embedding_model, topk_contents, n_gram
     return topk_contents
 
 
+class PerplexityFilter:
+    """
+    Filter sequences based on perplexity of the sequence.
+
+    Parameters
+    ----------
+    model : transformers.PreTrainedModel
+        Language model to use for perplexity calculation.
+    tokenizer : transformers.PreTrainedTokenizer
+        Tokenizer to use for encoding sequences.
+    threshold : float
+        Threshold for -log perplexity. sequences with perplexity below this threshold
+        will be considered "good" sequences.
+    window_size : int
+        Size of window to use for filtering. If window_size is 10, then the
+        -log perplexity of the first 10 tokens in the sequence will be compared to
+        the threshold.
+    """
+
+    def __init__(self, model, tokenizer, threshold, window_size=10):
+        self.tokenizer = tokenizer
+        self.model = model.cuda()
+        self.threshold = threshold
+        self.window_threshold = threshold
+        self.window_size = window_size
+        self.cn_loss = torch.nn.CrossEntropyLoss(reduction="none")
+
+    def get_log_prob(self, sequence):
+        input_ids = self.tokenizer.encode(sequence, return_tensors="pt").cuda()
+        with torch.no_grad():
+            logits = self.model(input_ids, labels=input_ids).logits
+        logits = logits[:, :-1, :].contiguous()
+        input_ids = input_ids[:, 1:].contiguous()
+        log_probs = self.cn_loss(logits.view(-1, logits.size(-1)), input_ids.view(-1))
+        return log_probs
+
+    def filter(self, sequences):
+        """
+        Standardized filter interface: returns filtered contents, diff array, and mask.
+        """
+        filtered_log_ppl = []
+        passed_filter = []
+        nlls = []
+        for sequence in sequences:
+            log_probs = self.get_log_prob(sequence)
+            nll_mean = log_probs.mean().item()
+            nlls.append(nll_mean)
+            passed = nll_mean <= self.threshold
+            passed_filter.append(passed)
+            filtered_log_ppl.append(nll_mean)
+        # For compatibility: diff is just the NLL (could be std or range if needed)
+        mask = np.array(passed_filter)
+        filtered_contents = [seq for seq, m in zip(sequences, mask) if m]
+        return filtered_contents
+
+    def filter_window(self, sequences, reverse=False):
+        """
+        Standardized window filter interface: returns filtered contents, diff array, and mask.
+        """
+        filtered_log_ppl_by_window = []
+        passed_filter_by_window = []
+        passed = []
+        nlls = []
+        for sequence in sequences:
+            sequence_window_scores = []
+            passed_window_filter = []
+            log_probs = self.get_log_prob(sequence)
+            NLL_by_token = log_probs
+            for i in np.arange(0, len(NLL_by_token), self.window_size):
+                if not reverse:
+                    window = NLL_by_token[i : i + self.window_size]
+                else:
+                    if i == 0:
+                        window = NLL_by_token[-self.window_size :]
+                    elif -(-i - self.window_size) > len(NLL_by_token) and i != 0:
+                        window = NLL_by_token[:-i]
+                    else:
+                        window = NLL_by_token[-i - self.window_size : -i]
+                mean_val = window.mean().item()
+                passed_window_filter.append(mean_val <= self.window_threshold)
+                sequence_window_scores.append(mean_val)
+            filtered_log_ppl_by_window.append(sequence_window_scores)
+            passed_filter_by_window.append(passed_window_filter)
+            passed.append(all(passed_window_filter))
+            nlls.append(np.mean(sequence_window_scores))
+        mask = np.array(passed)
+        filtered_contents = [seq for seq, m in zip(sequences, mask) if m]
+        return filtered_contents
+
+
 def similarity_filtering(topk_embeddings, topk_contents):
     top_k_filtered_avg = {}
     ppl_over_list = []
@@ -658,6 +748,101 @@ TRUNCATION_THRESHOLDS = {
         },
     },
 }
+
+
+# Thresholds based on quantiles
+PERPLEXITY_THRESHOLDS = {
+    95: {
+        "ance": {
+            "hotpotqa": {"dot": 2.910708451271057},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.799725687503815},
+            "msmarco": {"dot": 0},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 3.122442638874054},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 3.0446754932403564},
+            "msmarco": {"dot": 3.4049797654151894},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 2.941780900955199},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.993280267715454},
+            "msmarco": {"dot": 3.409883868694305},
+        },
+    },
+    # Thresholds based on 10th highest quantile (90th percentile)
+    90: {
+        "ance": {
+            "hotpotqa": {"dot": 2.6476390600204467},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.571706938743591},
+            "msmarco": {"dot": 0},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 2.799322819709778},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.7829957008361816},
+            "msmarco": {"dot": 3.0381710767745975},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 2.6698628425598145},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.728618454933167},
+            "msmarco": {"dot": 3.124883604049683},
+        },
+    },
+    # Thresholds based on 15th highest quantile (85th percentile)
+    85: {
+        "ance": {
+            "hotpotqa": {"dot": 2.486900770664215},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.407020854949951},
+            "msmarco": {"dot": 0},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 2.598045587539673},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.6037054300308227},
+            "msmarco": {"dot": 2.827660381793976},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 2.48363116979599},
+            "mirage": {"dot": 0},
+            "nq": {"dot": 2.5481189131736754},
+            "msmarco": {"dot": 2.936501622200012},
+        },
+    },
+}
+
+
+def get_thresholds_perplexity(model_code, dataset, score_function, percentile=90):
+    """
+    Get perplexity thresholds for given model, dataset, score function, and percentile.
+
+    Args:
+        model_code: Model identifier (e.g., "ance", "contriever")
+        dataset: Dataset name (e.g., "hotpotqa", "mirage")
+        score_function: Scoring function ("cos_sim" or "dot")
+        percentile: Which percentile to use (90 or 95)
+
+    Returns:
+        float: Perplexity threshold
+
+    Raises:
+        ValueError: If configuration not found
+    """
+    try:
+        threshold_dict = PERPLEXITY_THRESHOLDS[percentile]
+        model_config = threshold_dict[model_code]
+        dataset_config = model_config[dataset]
+        return dataset_config[score_function]
+    except KeyError:
+        available_configs = []
+        if model_code in threshold_dict:
+            for ds in threshold_dict[model_code]:
+                available_configs.append(f"{model_code}/{ds}/{score_function}")
 
 
 def get_thresholds_truncation(model_code, dataset, score_function, percentile=95):
@@ -1666,3 +1851,34 @@ def astute_query_gpt(top_ks, questions, llm):
         final_answers.append(llm.query(i))
 
     return final_answers
+
+
+def perplexity_filtering(
+    args,
+    tokenizer,
+    model,
+    contents,
+    iter_idx,
+    window_size=10,
+):
+    """
+    Apply perplexity filtering to contents.
+    Returns: filtered_contents, diff, mask
+    """
+    # Optionally, you can set threshold/window_size from args if needed
+    ppl_filter = PerplexityFilter(
+        model,
+        tokenizer,
+        get_thresholds_perplexity(
+            args.eval_model_code, args.eval_dataset, args.score_function
+        ),
+        window_size,
+    )
+    (filtered_contents,) = ppl_filter.filter(contents)
+    # Optionally, save outputs for analysis
+    save_outputs(
+        {"original_contents": contents, "filtered_contents": filtered_contents},
+        args.log_name,
+        f"sample_{iter_idx}_perplexity_scores",
+    )
+    return filtered_contents

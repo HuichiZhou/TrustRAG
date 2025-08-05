@@ -4,7 +4,7 @@
 #SBATCH --error=logs/job_%j.txt      # Standard error
 #SBATCH --ntasks=1                     # Number of tasks
 #SBATCH -c 8                      # number of cores (treats)
-#SBATCH --gres=gpu:L40:1
+#SBATCH --gres=gpu:A100:1
 #SBATCH --mail-user=tom.rahav@campus.technion.ac.il
 #SBATCH --mail-type=NONE                # Send email on all events
 
@@ -13,9 +13,9 @@ source .env
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate /home/tom.rahav/miniconda3/envs/trustrag
 
-MODEL=roberta
-SCORE=cos_sim
-DATASET=mirage
+MODEL=ance
+SCORE=dot
+DATASET=msmarco
 # Execute your Python script
 python evaluate_beir.py --model_code $MODEL \
                         --score_function $SCORE \

@@ -29,11 +29,12 @@ from src.defend_module import (
     instructrag_query_gpt,
     astute_query_gpt,
     k_mean_filtering,
+    perplexity_filtering,
 )
 from loguru import logger
 
 from lmdeploy import pipeline, GenerationConfig, TurbomindEngineConfig
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
 from src.gpt4_model import GPT
 import time
 from contextlib import contextmanager
@@ -123,6 +124,7 @@ def parse_args():
             "drift_window",
             "drift_uniform",
             "drift_kmeans_ngram",
+            "perplexity",
             "all",
         ],
     )
@@ -370,7 +372,19 @@ def main():
                             topk_contents,
                             "ngram" in args.removal_method,
                         )
-                    if "drift" in args.removal_method:
+                    elif args.removal_method == "perplexity":
+                        assert (
+                            "gpt" not in args.model_name
+                        ), "Perplexity filtering is not supported for GPT models."
+                        hf_tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+                        hf_model = AutoModelForCausalLM.from_pretrained(
+                            args.model_name
+                        ).cuda()
+                        hf_model.eval()
+                        topk_contents = perplexity_filtering(
+                            args, hf_tokenizer, hf_model, topk_contents, i
+                        )
+                    elif "drift" in args.removal_method:
                         if "window" in args.removal_method:
                             topk_contents = drift_filtering_sliding_window(
                                 args,
