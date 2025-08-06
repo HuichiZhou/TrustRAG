@@ -3,8 +3,8 @@
 # Define arrays of parameters 
 datasets=('msmarco') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
 models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o"
-eval_models_names=("contriever") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
-attacks=("hotflip") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"
+eval_models_names=("ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
+attacks=("hotflip" "aggd" "blackbox_hotflip") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"
 removals=('perplexity') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram' 'perplexity'
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('dot') # 'dot' 'cos_sim'

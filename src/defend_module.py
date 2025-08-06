@@ -1855,10 +1855,10 @@ def astute_query_gpt(top_ks, questions, llm):
 
 def perplexity_filtering(
     args,
-    tokenizer,
-    model,
     contents,
     iter_idx,
+    perp_tokenizer,
+    perp_model,
     window_size=10,
 ):
     """
@@ -1867,14 +1867,14 @@ def perplexity_filtering(
     """
     # Optionally, you can set threshold/window_size from args if needed
     ppl_filter = PerplexityFilter(
-        model,
-        tokenizer,
+        perp_model,
+        perp_tokenizer,
         get_thresholds_perplexity(
             args.eval_model_code, args.eval_dataset, args.score_function
         ),
         window_size,
     )
-    (filtered_contents,) = ppl_filter.filter(contents)
+    filtered_contents = ppl_filter.filter(contents)
     # Optionally, save outputs for analysis
     save_outputs(
         {"original_contents": contents, "filtered_contents": filtered_contents},

@@ -8,6 +8,7 @@ from src.utils import (
     load_json,
     load_cached_data,
 )
+import gc
 from src.utils import (
     setup_seeds,
     clean_str,
@@ -35,6 +36,7 @@ from loguru import logger
 
 from lmdeploy import pipeline, GenerationConfig, TurbomindEngineConfig
 from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
+
 from src.gpt4_model import GPT
 import time
 from contextlib import contextmanager
@@ -238,6 +240,13 @@ def main():
     total_injection_num_pass_removal = []
     total_original_top_k_text_in_top_k = []
     total_injection_num_in_top_k = []
+    if args.removal_method == "perplexity":
+        assert (
+            "gpt" not in args.model_name
+        ), "Perplexity filtering is not supported for GPT models."
+        perp_tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        perp_model = AutoModelForCausalLM.from_pretrained(args.model_name).cuda()
+        perp_model.eval()
 
     for iter in progress_bar(range(args.repeat_times), desc="Processing iterations"):
         target_queries_idx = range(iter * args.M, (iter + 1) * args.M)
@@ -373,16 +382,8 @@ def main():
                             "ngram" in args.removal_method,
                         )
                     elif args.removal_method == "perplexity":
-                        assert (
-                            "gpt" not in args.model_name
-                        ), "Perplexity filtering is not supported for GPT models."
-                        hf_tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-                        hf_model = AutoModelForCausalLM.from_pretrained(
-                            args.model_name
-                        ).cuda()
-                        hf_model.eval()
                         topk_contents = perplexity_filtering(
-                            args, hf_tokenizer, hf_model, topk_contents, i
+                            args, topk_contents, i, perp_tokenizer, perp_model
                         )
                     elif "drift" in args.removal_method:
                         if "window" in args.removal_method:
@@ -477,7 +478,7 @@ def main():
     total_adv_num = args.M * args.repeat_times * args.adv_per_query
     logger.info(f"total_topk_num: {total_topk_num}")
     logger.info(f"total_adv_num: {total_adv_num}")
-    if "drift" in args.removal_method or "kmeans" in args.removal_method:
+    if args.removal_method not in ['none', 'all']:
         logger.info(
             f"False removal rate in true content contents: {(1-total_original_top_k_text_pass_removal/total_topk_num):.2f}%"
         )
@@ -490,7 +491,22 @@ def main():
     save_outputs(sorted_contents, args.log_name, "sorted_contents")
     save_outputs(top_ks, args.log_name, "top_ks")
     save_outputs(questions, args.log_name, "questions")
+    if args.removal_method == "perplexity":
+        # make sure perp_model and perp_tokenizer are loaded
+        assert perp_model is not None, "Perplexity model is not loaded."
+        assert perp_tokenizer is not None, "Perplexity tokenizer is not loaded."
+        # Delete the model
+        del perp_model
+        del perp_tokenizer
 
+        # Clear Python garbage collection
+        gc.collect()
+
+        # Clear PyTorch cache (if using GPU)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()  # Wait for all operations to complete
+        print("Model deleted and memory cleared")
     if args.llm_flag:
         USE_API = (
             "gpt" in args.model_name
