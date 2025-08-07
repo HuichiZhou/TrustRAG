@@ -590,7 +590,9 @@ class ExperimentAnalyzer:
 
         # Filter data: only include "kmeans_ngram", "drift", and "drift_kmeans_ngram" removal methods
         filtered_data = self.df[
-            self.df["removal"].isin(["kmeans_ngram", "drift", "drift_kmeans_ngram"])
+            self.df["removal"].isin(
+                ["kmeans_ngram", "drift", "drift_kmeans_ngram", "perplexity"]
+            )
         ].copy()
 
         if filtered_data.empty:
@@ -657,6 +659,7 @@ class ExperimentAnalyzer:
                     kmeans_scores = []
                     drift_scores = []
                     drift_kmeans_ngram_scores = []
+                    perplexity_scores = []
 
                     for dataset in datasets:
                         dataset_data = avg_data[avg_data["dataset"] == dataset]
@@ -668,7 +671,9 @@ class ExperimentAnalyzer:
                         drift_kmeans_ngram_row = dataset_data[
                             dataset_data["removal"] == "drift_kmeans_ngram"
                         ]
-
+                        perplexity_row = dataset_data[
+                            dataset_data["removal"] == "perplexity"
+                        ]
                         kmeans_score = (
                             kmeans_row[metric].iloc[0]
                             if not kmeans_row.empty
@@ -682,10 +687,16 @@ class ExperimentAnalyzer:
                             if not drift_kmeans_ngram_row.empty
                             else np.nan
                         )
+                        perplexity_score = (
+                            perplexity_row[metric].iloc[0]
+                            if not perplexity_row.empty
+                            else np.nan
+                        )
 
                         kmeans_scores.append(kmeans_score)
                         drift_scores.append(drift_score)
                         drift_kmeans_ngram_scores.append(drift_kmeans_ngram_score)
+                        perplexity_scores.append(perplexity_score)
 
                     # Create bars
                     bars1 = plt.bar(
@@ -712,12 +723,21 @@ class ExperimentAnalyzer:
                         color="goldenrod",
                         alpha=0.8,
                     )
+                    bars4 = plt.bar(
+                        x + 2 * width,
+                        perplexity_scores,
+                        width,
+                        label="Perplexity",
+                        color="lightcoral",
+                        alpha=0.8,
+                    )
 
                     # Add value labels on bars
                     for bars, scores in [
                         (bars1, kmeans_scores),
                         (bars2, drift_scores),
                         (bars3, drift_kmeans_ngram_scores),
+                        (bars4, perplexity_scores),
                     ]:
                         for bar, score in zip(bars, scores):
                             if not np.isnan(score):
@@ -759,6 +779,7 @@ class ExperimentAnalyzer:
                         for s in kmeans_scores
                         + drift_scores
                         + drift_kmeans_ngram_scores
+                        + perplexity_scores
                         if not np.isnan(s)
                     ]
                     if all_scores:
@@ -1000,7 +1021,7 @@ class ExperimentAnalyzer:
 
         # Run different analysis sections
         self.analyze_comparison(
-            attack="hotflip", removal_methods=["drift", "kmeans_ngram"]
+            attack="hotflip", removal_methods=["drift", "kmeans_ngram", "perplexity"]
         )
         self.analyze_single_method(attack="hotflip", removal="all")
         self.analyze_no_attack()

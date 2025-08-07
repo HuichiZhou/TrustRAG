@@ -755,19 +755,19 @@ PERPLEXITY_THRESHOLDS = {
     95: {
         "ance": {
             "hotpotqa": {"dot": 2.910708451271057},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.776334488391876},
             "nq": {"dot": 2.799725687503815},
             "msmarco": {"dot": 0},
         },
         "contriever": {
             "hotpotqa": {"dot": 3.122442638874054},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.9518614649772643},
             "nq": {"dot": 3.0446754932403564},
             "msmarco": {"dot": 3.4049797654151894},
         },
         "contriever-ms": {
             "hotpotqa": {"dot": 2.941780900955199},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.85638724565506},
             "nq": {"dot": 2.993280267715454},
             "msmarco": {"dot": 3.409883868694305},
         },
@@ -776,19 +776,19 @@ PERPLEXITY_THRESHOLDS = {
     90: {
         "ance": {
             "hotpotqa": {"dot": 2.6476390600204467},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.7321505308151246},
             "nq": {"dot": 2.571706938743591},
             "msmarco": {"dot": 0},
         },
         "contriever": {
             "hotpotqa": {"dot": 2.799322819709778},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.8674068450927734},
             "nq": {"dot": 2.7829957008361816},
             "msmarco": {"dot": 3.0381710767745975},
         },
         "contriever-ms": {
             "hotpotqa": {"dot": 2.6698628425598145},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.7833786725997927},
             "nq": {"dot": 2.728618454933167},
             "msmarco": {"dot": 3.124883604049683},
         },
@@ -797,19 +797,19 @@ PERPLEXITY_THRESHOLDS = {
     85: {
         "ance": {
             "hotpotqa": {"dot": 2.486900770664215},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.706580603122711},
             "nq": {"dot": 2.407020854949951},
             "msmarco": {"dot": 0},
         },
         "contriever": {
             "hotpotqa": {"dot": 2.598045587539673},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.800379252433777},
             "nq": {"dot": 2.6037054300308227},
             "msmarco": {"dot": 2.827660381793976},
         },
         "contriever-ms": {
             "hotpotqa": {"dot": 2.48363116979599},
-            "mirage": {"dot": 0},
+            "mirage": {"dot": 2.733857703208923},
             "nq": {"dot": 2.5481189131736754},
             "msmarco": {"dot": 2.936501622200012},
         },

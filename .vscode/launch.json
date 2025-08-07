@@ -62,6 +62,20 @@
             ]
         },
         {
+            "name": "Analyze with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "/home/tom.rahav/miniconda3/envs/trustrag/bin/python",
+            "console": "integratedTerminal",
+            // "justMyCode": false,
+            "args": [
+                "--logs_dir /home/tom.rahav/TrustRAG/logs",
+                "--output_csv /home/tom.rahav/TrustRAG/notebooks/extracted_analysis_data.csv",
+                "--delete_incomplete"
+            ]
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
