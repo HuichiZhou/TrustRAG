@@ -21,14 +21,15 @@ from src.prompts import wrap_prompt
 import torch
 from src.defend_module import (
     astute_query,
+    astute_query_gpt,
     conflict_query,
     conflict_query_gpt,
     drift_filtering_sliding_window,
     drift_filtering_truncation,
     drift_filtering_uniform,
+    drift_filtering_perplexity,
     instructrag_query,
     instructrag_query_gpt,
-    astute_query_gpt,
     k_mean_filtering,
     perplexity_filtering,
 )
@@ -127,6 +128,7 @@ def parse_args():
             "drift_uniform",
             "drift_kmeans_ngram",
             "perplexity",
+            "drift_perplexity",
             "all",
         ],
     )
@@ -145,6 +147,12 @@ def parse_args():
         action="store_true",
     )
     parser.add_argument("--adv_a_position", type=str, default="start")
+    parser.add_argument(
+        "--lambda_ppl",
+        type=float,
+        default=0.0,
+        help="Weight for perplexity loss in attack optimization (default: 0.0, disables perplexity).",
+    )
 
     args = parser.parse_args()
     logger.info(args)
@@ -240,11 +248,12 @@ def main():
     total_injection_num_pass_removal = []
     total_original_top_k_text_in_top_k = []
     total_injection_num_in_top_k = []
-    if args.removal_method == "perplexity":
+    if "perplexity" in args.removal_method:
         assert (
             "gpt" not in args.model_name
         ), "Perplexity filtering is not supported for GPT models."
         perp_tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
         perp_model = AutoModelForCausalLM.from_pretrained(args.model_name).cuda()
         perp_model.eval()
 
@@ -260,6 +269,14 @@ def main():
                 c_model=c_model,
                 tokenizer=tokenizer,
                 get_emb=get_emb,
+                # Pass perplexity model, tokenizer, and lambda_ppl to attacker
+                perplexity_model=(
+                    perp_model if args.removal_method == "perplexity" else None
+                ),
+                perplexity_tokenizer=(
+                    perp_tokenizer if args.removal_method == "perplexity" else None
+                ),
+                lambda_ppl=getattr(args, "lambda_ppl", 0.0),
             )
             for idx in target_queries_idx:
                 top1_idx = list(results[incorrect_answers[idx]["id"]].keys())[0]
@@ -385,6 +402,14 @@ def main():
                         topk_contents = perplexity_filtering(
                             args, topk_contents, i, perp_tokenizer, perp_model
                         )
+                    elif args.removal_method == "drift_perplexity":
+                        topk_contents = drift_filtering_perplexity(
+                            args,
+                            topk_contents,
+                            i,
+                            perp_tokenizer,
+                            perp_model,
+                        )
                     elif "drift" in args.removal_method:
                         if "window" in args.removal_method:
                             topk_contents = drift_filtering_sliding_window(
@@ -478,7 +503,7 @@ def main():
     total_adv_num = args.M * args.repeat_times * args.adv_per_query
     logger.info(f"total_topk_num: {total_topk_num}")
     logger.info(f"total_adv_num: {total_adv_num}")
-    if args.removal_method not in ['none', 'all']:
+    if args.removal_method not in ["none", "all"]:
         logger.info(
             f"False removal rate in true content contents: {(1-total_original_top_k_text_pass_removal/total_topk_num):.2f}%"
         )

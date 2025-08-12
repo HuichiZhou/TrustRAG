@@ -7,6 +7,12 @@ import seaborn as sns
 import argparse
 import numpy as np  # For NaN values
 
+REMOVAL_METHODS = [
+    "kmeans_ngram",
+    "drift",
+    "perplexity",
+]  #     "kmeans_ngram", "drift", "drift_kmeans_ngram", "perplexity",
+
 
 def parse_log_file(file_path):
     """
@@ -52,9 +58,10 @@ def parse_log_file(file_path):
                 "adv_per_query": r"adv_per_query(\d+)",
                 "M": r"-M(\d+)",  # Added M back based on folder name
                 "repeat": r"Repeat(\d+)",  # Added Repeat back based on folder name
-                "top_k": r"-Top_(\d+)",  # Added M back based on folder name
+                "top_k": r"-top_(\d+)",  # Added M back based on folder name
                 "no_questions": r"no_questions",
                 "both_sides": r"both_sides",
+                "num_tokens_removed": r"-num_tokens_removed_(\d+)",
             }
             for key, pattern in patterns.items():
                 match = re.search(pattern, experiment_name)
@@ -415,7 +422,7 @@ class ExperimentAnalyzer:
     ):
         """Analyze comparison between removal methods."""
         if removal_methods is None:
-            removal_methods = ["drift", "kmeans_ngram"]
+            removal_methods = REMOVAL_METHODS
 
         print(
             f"\n--- Analyzing {' vs '.join(removal_methods)} removal methods ({attack.title()} Attack) ---"
@@ -578,244 +585,6 @@ class ExperimentAnalyzer:
                             comparison_mode,
                         )
 
-    def create_dataset_performance_barplots(self):
-        """Create barplots comparing kmeans, drift, and drift_kmeans_ngram methods for each dataset."""
-        print(
-            "\n--- Creating Dataset Performance Barplots (KMeans, Drift, DriftKMeansNGram) ---"
-        )
-
-        if not self.has_dataset:
-            print("No dataset column found. Skipping dataset performance barplots.")
-            return
-
-        # Filter data: only include "kmeans_ngram", "drift", and "drift_kmeans_ngram" removal methods
-        filtered_data = self.df[
-            self.df["removal"].isin(
-                ["kmeans_ngram", "drift", "drift_kmeans_ngram", "perplexity"]
-            )
-        ].copy()
-
-        if filtered_data.empty:
-            print(
-                "No data available for kmeans, drift, or drift_kmeans_ngram removal methods. Skipping dataset barplots."
-            )
-            return
-
-        # Check required columns
-        required_metrics = ["f1_score", "precision", "recall"]
-        available_metrics = [m for m in required_metrics if m in filtered_data.columns]
-
-        if not available_metrics:
-            print(
-                "No required metrics (f1_score, precision, recall) found. Skipping dataset barplots."
-            )
-            return
-
-        # Update attack types to include blackbox_hotflip and aggd
-        attack_types = ["none", "hotflip", "aggd", "blackbox_hotflip"]
-        score_functions = ["dot", "cos"]
-
-        # Generate plots for each combination
-        for attack in attack_types:
-            attack_data = filtered_data[filtered_data["attack"] == attack]
-
-            if attack_data.empty:
-                print(f"No data found for attack type: {attack}")
-                continue
-
-            for score_func in score_functions:
-                score_data = attack_data[attack_data["score"] == score_func]
-
-                if score_data.empty:
-                    print(f"No data found for attack: {attack}, score: {score_func}")
-                    continue
-
-                # Calculate averages across retrieval models and LLMs for each removal method
-                # Group by dataset and removal method, calculate mean for each metric
-                avg_data = (
-                    score_data.groupby(["dataset", "removal"])[available_metrics]
-                    .mean()
-                    .reset_index()
-                )
-
-                # Get unique datasets
-                datasets = avg_data["dataset"].unique()
-
-                for metric in available_metrics:
-                    if avg_data[metric].dropna().empty:
-                        print(
-                            f"No valid data for metric: {metric}, attack: {attack}, score: {score_func}"
-                        )
-                        continue
-
-                    # Create comparison barplot
-                    plt.figure(figsize=(12, 7))
-
-                    # Prepare data for grouped bar plot
-                    x = np.arange(len(datasets))
-                    width = 0.22
-
-                    # Get data for kmeans, drift, and drift_kmeans_ngram methods
-                    kmeans_scores = []
-                    drift_scores = []
-                    drift_kmeans_ngram_scores = []
-                    perplexity_scores = []
-
-                    for dataset in datasets:
-                        dataset_data = avg_data[avg_data["dataset"] == dataset]
-
-                        kmeans_row = dataset_data[
-                            dataset_data["removal"] == "kmeans_ngram"
-                        ]
-                        drift_row = dataset_data[dataset_data["removal"] == "drift"]
-                        drift_kmeans_ngram_row = dataset_data[
-                            dataset_data["removal"] == "drift_kmeans_ngram"
-                        ]
-                        perplexity_row = dataset_data[
-                            dataset_data["removal"] == "perplexity"
-                        ]
-                        kmeans_score = (
-                            kmeans_row[metric].iloc[0]
-                            if not kmeans_row.empty
-                            else np.nan
-                        )
-                        drift_score = (
-                            drift_row[metric].iloc[0] if not drift_row.empty else np.nan
-                        )
-                        drift_kmeans_ngram_score = (
-                            drift_kmeans_ngram_row[metric].iloc[0]
-                            if not drift_kmeans_ngram_row.empty
-                            else np.nan
-                        )
-                        perplexity_score = (
-                            perplexity_row[metric].iloc[0]
-                            if not perplexity_row.empty
-                            else np.nan
-                        )
-
-                        kmeans_scores.append(kmeans_score)
-                        drift_scores.append(drift_score)
-                        drift_kmeans_ngram_scores.append(drift_kmeans_ngram_score)
-                        perplexity_scores.append(perplexity_score)
-
-                    # Create bars
-                    bars1 = plt.bar(
-                        x - width,
-                        kmeans_scores,
-                        width,
-                        label="TrustRAG",
-                        color="darkslateblue",
-                        alpha=0.8,
-                    )
-                    bars2 = plt.bar(
-                        x,
-                        drift_scores,
-                        width,
-                        label="Drift",
-                        color="darkcyan",
-                        alpha=0.8,
-                    )
-                    bars3 = plt.bar(
-                        x + width,
-                        drift_kmeans_ngram_scores,
-                        width,
-                        label="DriftKMeansNGram",
-                        color="goldenrod",
-                        alpha=0.8,
-                    )
-                    bars4 = plt.bar(
-                        x + 2 * width,
-                        perplexity_scores,
-                        width,
-                        label="Perplexity",
-                        color="lightcoral",
-                        alpha=0.8,
-                    )
-
-                    # Add value labels on bars
-                    for bars, scores in [
-                        (bars1, kmeans_scores),
-                        (bars2, drift_scores),
-                        (bars3, drift_kmeans_ngram_scores),
-                        (bars4, perplexity_scores),
-                    ]:
-                        for bar, score in zip(bars, scores):
-                            if not np.isnan(score):
-                                height = bar.get_height()
-                                plt.text(
-                                    bar.get_x() + bar.get_width() / 2.0,
-                                    height + 0.01,
-                                    f"{score:.3f}",
-                                    ha="center",
-                                    va="bottom",
-                                    fontweight="bold",
-                                    fontsize=9,
-                                )
-
-                    # Customize plot
-                    metric_title = metric.replace("_", " ").title()
-                    attack_title = (
-                        "No Attack" if attack == "none" else attack.title() + " Attack"
-                    )
-                    score_title = (
-                        "Cosine Similarity" if score_func == "cos" else "Dot Product"
-                    )
-
-                    plt.title(
-                        f"{metric_title} Comparison by Dataset: \n{attack_title} - {score_title}",
-                        fontsize=14,
-                        fontweight="bold",
-                    )
-                    plt.xlabel("Dataset", fontsize=12, fontweight="bold")
-                    plt.ylabel(
-                        f"Average {metric_title}", fontsize=12, fontweight="bold"
-                    )
-                    plt.xticks(x, datasets, rotation=45, ha="right")
-                    plt.legend()
-
-                    # Set y-axis limits for better visualization
-                    all_scores = [
-                        s
-                        for s in kmeans_scores
-                        + drift_scores
-                        + drift_kmeans_ngram_scores
-                        + perplexity_scores
-                        if not np.isnan(s)
-                    ]
-                    if all_scores:
-                        y_min = max(0, min(all_scores) - 0.05)
-                        y_max = min(1, max(all_scores) + 0.1)
-                        plt.ylim(y_min, y_max)
-
-                    # Add grid for better readability
-                    plt.grid(axis="y", alpha=0.3)
-                    plt.tight_layout()
-
-                    # Save plot
-                    filename = (
-                        f"dataset_{metric}_{attack}_attack_{score_func}_score.png"
-                    )
-                    filepath = os.path.join(self.output_dir, filename)
-
-                    try:
-                        plt.savefig(filepath, dpi=300, bbox_inches="tight")
-                        print(f"Saved dataset comparison plot: {filepath}")
-                    except Exception as e:
-                        print(f"Error saving dataset comparison plot {filepath}: {e}")
-                    finally:
-                        plt.close()
-
-                # Create combined plot showing all three metrics for this attack/score combination
-                if len(available_metrics) > 1:
-                    self._create_combined_metrics_comparison_plot(
-                        avg_data,
-                        available_metrics,
-                        attack,
-                        score_func,
-                        datasets,
-                        include_drift_kmeans_ngram=True,  # Pass flag to include new method
-                    )
-
     def _create_combined_metrics_comparison_plot(
         self,
         avg_data: pd.DataFrame,
@@ -823,9 +592,9 @@ class ExperimentAnalyzer:
         attack: str,
         score_func: str,
         datasets,
-        include_drift_kmeans_ngram=False,
+        num_tokens,
     ):
-        """Create a combined plot comparing kmeans, drift, and drift_kmeans_ngram across all metrics."""
+        """Create a combined plot comparing removal methods across all metrics."""
         fig, axes = plt.subplots(1, len(metrics), figsize=(5 * len(metrics), 6))
         if len(metrics) == 1:
             axes = [axes]
@@ -834,81 +603,35 @@ class ExperimentAnalyzer:
             "kmeans_ngram": "darkslateblue",
             "drift": "darkcyan",
             "drift_kmeans_ngram": "goldenrod",
+            "perplexity": "lightcoral",
         }
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
-
             x = np.arange(len(datasets))
             width = 0.22
 
-            kmeans_scores = []
-            drift_scores = []
-            drift_kmeans_ngram_scores = []
-
+            # Prepare scores for each removal method in REMOVAL_METHODS
+            scores_dict = {method: [] for method in REMOVAL_METHODS}
             for dataset in datasets:
                 dataset_data = avg_data[avg_data["dataset"] == dataset]
+                for method in REMOVAL_METHODS:
+                    row = dataset_data[dataset_data["removal"] == method]
+                    score = row[metric].iloc[0] if not row.empty else np.nan
+                    scores_dict[method].append(score)
 
-                kmeans_row = dataset_data[dataset_data["removal"] == "kmeans_ngram"]
-                drift_row = dataset_data[dataset_data["removal"] == "drift"]
-                drift_kmeans_ngram_row = dataset_data[
-                    dataset_data["removal"] == "drift_kmeans_ngram"
-                ]
-
-                kmeans_score = (
-                    kmeans_row[metric].iloc[0] if not kmeans_row.empty else np.nan
-                )
-                drift_score = (
-                    drift_row[metric].iloc[0] if not drift_row.empty else np.nan
-                )
-                drift_kmeans_ngram_score = (
-                    drift_kmeans_ngram_row[metric].iloc[0]
-                    if not drift_kmeans_ngram_row.empty
-                    else np.nan
-                )
-
-                kmeans_scores.append(kmeans_score)
-                drift_scores.append(drift_score)
-                drift_kmeans_ngram_scores.append(drift_kmeans_ngram_score)
-
-            # Create bars
-            bars1 = ax.bar(
-                x - width,
-                kmeans_scores,
-                width,
-                label="TrustRAG" if idx == 0 else "",
-                color=colors["kmeans_ngram"],
-                alpha=0.8,
-            )
-            bars2 = ax.bar(
-                x,
-                drift_scores,
-                width,
-                label="Drift" if idx == 0 else "",
-                color=colors["drift"],
-                alpha=0.8,
-            )
-            if include_drift_kmeans_ngram:
-                bars3 = ax.bar(
-                    x + width,
-                    drift_kmeans_ngram_scores,
+            # Create bars for each method
+            for i, method in enumerate(REMOVAL_METHODS):
+                bars = ax.bar(
+                    x + (i - len(REMOVAL_METHODS) // 2) * width,
+                    scores_dict[method],
                     width,
-                    label="DriftKMeansNGram" if idx == 0 else "",
-                    color=colors["drift_kmeans_ngram"],
+                    label=method.title() if idx == 0 else "",
+                    color=colors.get(method, "gray"),
                     alpha=0.8,
                 )
-
-            # Add value labels
-            for bars, scores in [
-                (bars1, kmeans_scores),
-                (bars2, drift_scores),
-                (
-                    (bars3, drift_kmeans_ngram_scores)
-                    if include_drift_kmeans_ngram
-                    else ([], [])
-                ),
-            ]:
-                for bar, score in zip(bars, scores):
+                # Add value labels
+                for bar, score in zip(bars, scores_dict[method]):
                     if not np.isnan(score):
                         height = bar.get_height()
                         ax.text(
@@ -946,7 +669,7 @@ class ExperimentAnalyzer:
         plt.tight_layout()
 
         # Save combined plot
-        filename = f"dataset_combined_{attack}_attack_{score_func}_score.png"
+        filename = f"dataset_combined_{attack}_attack_{score_func}_score_{num_tokens}_num_tokens.png"
         filepath = os.path.join(self.output_dir, filename)
 
         try:
@@ -1028,9 +751,185 @@ class ExperimentAnalyzer:
         self.analyze_f1_scores()
 
         # Create dataset performance barplots
-        self.create_dataset_performance_barplots()
+        self.create_dataset_performance_barplots_by_tokens_removed()
 
         print("\n--- Finished Generating All Visualizations with F1 Score ---")
+
+    def create_dataset_performance_barplots_by_tokens_removed(self):
+        """
+        Create barplots comparing removal methods for each dataset,
+        separately for each value of num_tokens_removed.
+        """
+        print("\n--- Creating Dataset Performance Barplots by num_tokens_removed ---")
+
+        if not self.has_dataset:
+            print("No dataset column found. Skipping dataset performance barplots.")
+            return
+
+        if "num_tokens_removed" not in self.df.columns:
+            print("No num_tokens_removed column found in data.")
+            return
+
+        filtered_data = self.df[self.df["removal"].isin(REMOVAL_METHODS)].copy()
+        if filtered_data.empty:
+            print(
+                f"No data available for removal methods: {REMOVAL_METHODS}. Skipping dataset barplots."
+            )
+            return
+
+        required_metrics = ["f1_score", "precision", "recall"]
+        available_metrics = [m for m in required_metrics if m in filtered_data.columns]
+        if not available_metrics:
+            print(
+                "No required metrics (f1_score, precision, recall) found. Skipping dataset barplots."
+            )
+            return
+
+        attack_types = ["none", "hotflip", "aggd", "blackbox_hotflip"]
+        score_functions = ["dot", "cos"]
+
+        unique_tokens_removed = sorted(
+            filtered_data["num_tokens_removed"].dropna().unique()
+        )
+        for num_tokens in unique_tokens_removed:
+            data_tokens = filtered_data[
+                filtered_data["num_tokens_removed"] == num_tokens
+            ]
+            if data_tokens.empty:
+                continue
+
+            for attack in attack_types:
+                attack_data = data_tokens[data_tokens["attack"] == attack]
+                if attack_data.empty:
+                    print(
+                        f"No data found for attack type: {attack} with num_tokens_removed={num_tokens}"
+                    )
+                    continue
+
+                for score_func in score_functions:
+                    score_data = attack_data[attack_data["score"] == score_func]
+                    if score_data.empty:
+                        print(
+                            f"No data found for attack: {attack}, score: {score_func}, num_tokens_removed={num_tokens}"
+                        )
+                        continue
+
+                    avg_data = (
+                        score_data.groupby(["dataset", "removal"])[available_metrics]
+                        .mean()
+                        .reset_index()
+                    )
+                    datasets = avg_data["dataset"].unique()
+
+                    for metric in available_metrics:
+                        if avg_data[metric].dropna().empty:
+                            print(
+                                f"No valid data for metric: {metric}, attack: {attack}, score: {score_func}, num_tokens_removed={num_tokens}"
+                            )
+                            continue
+
+                        plt.figure(figsize=(12, 7))
+                        x = np.arange(len(datasets))
+                        width = 0.22
+
+                        scores_dict = {method: [] for method in REMOVAL_METHODS}
+                        for dataset in datasets:
+                            dataset_data = avg_data[avg_data["dataset"] == dataset]
+                            for method in REMOVAL_METHODS:
+                                row = dataset_data[dataset_data["removal"] == method]
+                                score = row[metric].iloc[0] if not row.empty else np.nan
+                                scores_dict[method].append(score)
+
+                        colors = {
+                            "kmeans_ngram": "darkslateblue",
+                            "drift": "darkcyan",
+                            "drift_kmeans_ngram": "goldenrod",
+                            "perplexity": "lightcoral",
+                        }
+
+                        for i, method in enumerate(REMOVAL_METHODS):
+                            bars = plt.bar(
+                                x + (i - len(REMOVAL_METHODS) // 2) * width,
+                                scores_dict[method],
+                                width,
+                                label=method.replace("_", " ").title(),
+                                color=colors.get(method, "gray"),
+                                alpha=0.8,
+                            )
+                            for bar, score in zip(bars, scores_dict[method]):
+                                if not np.isnan(score):
+                                    height = bar.get_height()
+                                    plt.text(
+                                        bar.get_x() + bar.get_width() / 2.0,
+                                        height + 0.01,
+                                        f"{score:.3f}",
+                                        ha="center",
+                                        va="bottom",
+                                        fontweight="bold",
+                                        fontsize=9,
+                                    )
+
+                        metric_title = metric.replace("_", " ").title()
+                        attack_title = (
+                            "No Attack"
+                            if attack == "none"
+                            else attack.title() + " Attack"
+                        )
+                        score_title = (
+                            "Cosine Similarity"
+                            if score_func == "cos"
+                            else "Dot Product"
+                        )
+
+                        plt.title(
+                            f"{metric_title} Comparison by Dataset: \n{attack_title} - {score_title}\nTokens Removed: {num_tokens}",
+                            fontsize=14,
+                            fontweight="bold",
+                        )
+                        plt.xlabel("Dataset", fontsize=12, fontweight="bold")
+                        plt.ylabel(
+                            f"Average {metric_title}", fontsize=12, fontweight="bold"
+                        )
+                        plt.xticks(x, datasets, rotation=45, ha="right")
+                        plt.legend()
+
+                        all_scores = [
+                            s
+                            for method_scores in scores_dict.values()
+                            for s in method_scores
+                            if not np.isnan(s)
+                        ]
+                        if all_scores:
+                            y_min = max(0, min(all_scores) - 0.05)
+                            y_max = min(1, max(all_scores) + 0.1)
+                            plt.ylim(y_min, y_max)
+
+                        plt.grid(axis="y", alpha=0.3)
+                        plt.tight_layout()
+
+                        filename = f"dataset_{metric}_{attack}_attack_{score_func}_tokens_removed_{num_tokens}.png"
+                        filepath = os.path.join(self.output_dir, filename)
+
+                        try:
+                            plt.savefig(filepath, dpi=300, bbox_inches="tight")
+                            print(f"Saved dataset comparison plot: {filepath}")
+                        except Exception as e:
+                            print(
+                                f"Error saving dataset comparison plot {filepath}: {e}"
+                            )
+                        finally:
+                            plt.close()
+
+                    # Combined plot for all metrics
+                    if len(available_metrics) > 1:
+                        self._create_combined_metrics_comparison_plot(
+                            avg_data,
+                            available_metrics,
+                            attack,
+                            score_func,
+                            datasets,
+                            num_tokens,
+                        )
 
 
 def analyze_and_visualize(df: pd.DataFrame, output_dir: str = "plots"):

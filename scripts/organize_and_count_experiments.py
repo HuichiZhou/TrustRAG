@@ -75,6 +75,10 @@ class TrustRAGExperimentAnalyzer:
                 experiment_config["experimental_setup"] = part
             elif "no_questions_both_sides" in part:
                 experiment_config["question_mode"] = part
+            elif "num_tokens_to_remove" in part:
+                experiment_config["num_tokens_to_remove"] = part.replace(
+                    "num_tokens_to_remove_", ""
+                )
 
         return experiment_config
 

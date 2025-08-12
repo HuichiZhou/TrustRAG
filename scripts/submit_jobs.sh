@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+datasets=('nq' 'hotpotqa' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
 models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o"
 eval_models_names=("contriever" "contriever-ms" "ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
 attacks=("hotflip" "aggd" "blackbox_hotflip") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"
-removals=('perplexity') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram' 'perplexity'
+removals=('drift') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram' 'perplexity'
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('dot') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'
-advs_per_query=(5)
-num_tokens_to_remove=(30) # 0 5 10 15 20 25 30 35 40 45 50 55 56
+advs_per_query=(1 3 5)
+num_tokens_to_remove=(20 40) # 0 5 10 15 20 25 30 35 40 45 50 55 56
 
 
 index=1  # Initialize counter

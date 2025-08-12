@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument(
         "--method",
         type=str,
-        choices=["drift", "perplexity"],
+        choices=["drift", "perplexity", "drift_perplexity"],
         required=True,
         help="Filtering method to use",
     )
@@ -118,7 +118,6 @@ def main():
         print(
             f"Average documents removed by drift: {avg_removed:.2f} out of top-{args.top_k}"
         )
-
         save_outputs(
             diff_start_all,
             log_args.log_name,
@@ -147,8 +146,6 @@ def main():
             results.items(), desc="Calculating NLLs for perplexity threshold"
         ):
             i += 1
-            if i % 500 == 0:
-                break
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
 
@@ -185,6 +182,102 @@ def main():
             all_threshs,
             log_args.log_name,
             f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-nlls_all",
+        )
+    elif args.method == "drift_perplexity":
+        gen_model_name = "meta-llama/Llama-3.1-8B-Instruct"
+        print(f"Loading generation model: {gen_model_name}")
+        gen_tokenizer = AutoTokenizer.from_pretrained(gen_model_name)
+        gen_tokenizer.pad_token = gen_tokenizer.eos_token
+        gen_model = AutoModelForCausalLM.from_pretrained(gen_model_name).to(device)
+        gen_model.eval()
+
+        all_drift_scores_start = []
+        all_drift_scores_end = []
+        loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
+
+        window_size = 30  # or set via argument
+        i = 0
+        for query_id, topk_dict in tqdm(
+            results.items(), desc="Calculating drift perplexity scores"
+        ):
+            i += 1
+            # if i % 100 == 0:
+            #     break
+            topk_indices = list(topk_dict.keys())[: args.top_k]
+            original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
+
+            for doc in original_docs:
+                if not doc:
+                    continue
+                input_ids = gen_tokenizer(
+                    doc, return_tensors="pt", truncation=True, padding=True
+                ).input_ids.to(device)
+                with torch.no_grad():
+                    logits = gen_model(input_ids, labels=input_ids).logits
+                    shift_logits = logits[:, :-1, :].contiguous()
+                    shift_labels = input_ids[:, 1:].contiguous()
+                    losses = loss_fct(
+                        shift_logits.view(-1, shift_logits.size(-1)),
+                        shift_labels.view(-1),
+                    )
+                    orig_ppl = losses.nanmean().item()
+
+                seq_len = input_ids.shape[1]
+                # Start truncation
+                if seq_len > int(window_size * 1.5):
+                    truncated_start = input_ids[:, window_size:]
+                    with torch.no_grad():
+                        logits = gen_model(
+                            truncated_start, labels=truncated_start
+                        ).logits
+                        shift_logits = logits[:, :-1, :].contiguous()
+                        shift_labels = truncated_start[:, 1:].contiguous()
+                        losses = loss_fct(
+                            shift_logits.view(-1, shift_logits.size(-1)),
+                            shift_labels.view(-1),
+                        )
+                        drift_ppl_start = losses.nanmean().item()
+                else:
+                    drift_ppl_start = orig_ppl
+
+                # End truncation
+                if seq_len > window_size:
+                    truncated_end = input_ids[:, : seq_len - window_size]
+                    with torch.no_grad():
+                        logits = gen_model(truncated_end, labels=truncated_end).logits
+                        shift_logits = logits[:, :-1, :].contiguous()
+                        shift_labels = truncated_end[:, 1:].contiguous()
+                        losses = loss_fct(
+                            shift_logits.view(-1, shift_logits.size(-1)),
+                            shift_labels.view(-1),
+                        )
+                        drift_ppl_end = losses.nanmean().item()
+                else:
+                    drift_ppl_end = orig_ppl
+
+                drift_score_start = abs(drift_ppl_start - orig_ppl)
+                drift_score_end = abs(drift_ppl_end - orig_ppl)
+                all_drift_scores_start.append(drift_score_start)
+                all_drift_scores_end.append(drift_score_end)
+
+        all_drift_scores_start = np.array(all_drift_scores_start)
+        all_drift_scores_end = np.array(all_drift_scores_end)
+        percentiles = [95, 90, 85]
+        thresh_start = np.percentile(all_drift_scores_start, percentiles)
+        thresh_end = np.percentile(all_drift_scores_end, percentiles)
+        for pct, t_start, t_end in zip(percentiles, thresh_start, thresh_end):
+            print(f"{pct}th percentile drift perplexity (start): {t_start:.4f}")
+            print(f"{pct}th percentile drift perplexity (end): {t_end:.4f}")
+
+        save_outputs(
+            thresh_start,
+            log_args.log_name,
+            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_perplexity_start",
+        )
+        save_outputs(
+            thresh_end,
+            log_args.log_name,
+            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_perplexity_end",
         )
     else:
         raise ValueError("Unknown method")

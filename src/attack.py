@@ -62,6 +62,11 @@ class Attacker:
             f"results/adv_targeted_results/{args.eval_dataset}.json"
         )
         logger.info(f"Initializing attacker with method: {args.attack_method}")
+        self.perplexity_model = kwargs.get("perplexity_model", None)
+        self.perplexity_tokenizer = kwargs.get("perplexity_tokenizer", None)
+        self.lambda_ppl = kwargs.get(
+            "lambda_ppl", 0.0
+        )  # 0 disables perplexity, >0 enables
 
     def _get_cache_path(self):
         model_name = getattr(
@@ -70,7 +75,8 @@ class Attacker:
         dataset_name = getattr(self.args, "eval_dataset")
         cache_dir = "results/adv_cache"
         os.makedirs(cache_dir, exist_ok=True)
-        cache_file = f"{cache_dir}/cache_{dataset_name}_{model_name}_{self.attack_method}_{self.adv_a_position}.json"
+        lambda_arg = "" if self.lambda_ppl == 0.0 else f"_lambda_{self.lambda_ppl}"
+        cache_file = f"{cache_dir}/cache_{dataset_name}_{model_name}_{self.attack_method}_{self.adv_a_position}{lambda_arg}.json"
         return cache_file
 
     def _load_cache(self):
@@ -230,7 +236,7 @@ class Attacker:
         adv_a_len,
         adv_b_len,
     ):
-        """Single HotFlip iteration."""
+        """Single HotFlip iteration with optional perplexity loss."""
         device = adv_passage_ids.device
 
         self.c_model.zero_grad()
@@ -243,8 +249,16 @@ class Attacker:
         p_emb = self.get_emb(self.c_model, p_sent)
 
         sim = self._compute_similarity(p_emb, q_emb)
-        loss = sim.mean()
-        loss.backward()
+        sim_loss = sim.mean()
+
+        # Compute perplexity loss
+        ppl_loss = 0.0
+        if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
+            ppl_loss = self._compute_perplexity(adv_passage_ids)
+
+        # Combine losses (maximize similarity, minimize perplexity)
+        total_loss = sim_loss - self.lambda_ppl * ppl_loss
+        total_loss.backward()
 
         temp_grad = embedding_gradient.get()
         grad = temp_grad.sum(dim=0)
@@ -262,7 +276,7 @@ class Attacker:
             filter=None,
         )
 
-        current_score = loss.sum().cpu().item()
+        current_score = total_loss.sum().cpu().item()
         candidate_scores = torch.zeros(self.num_cand, device=device)
 
         for i, candidate in enumerate(candidates):
@@ -276,8 +290,12 @@ class Attacker:
             temp_p_emb = self.get_emb(self.c_model, temp_p_sent)
             with torch.no_grad():
                 temp_sim = self._compute_similarity(temp_p_emb, q_emb)
-                can_loss = temp_sim.mean()
-                candidate_scores[i] = can_loss.sum().cpu().item()
+                temp_sim_loss = temp_sim.mean()
+                temp_ppl_loss = 0.0
+                if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
+                    temp_ppl_loss = self._compute_perplexity(temp_adv_passage)
+                temp_total_loss = temp_sim_loss - self.lambda_ppl * temp_ppl_loss
+                candidate_scores[i] = temp_total_loss.sum().cpu().item()
 
         # Update if better candidate found
         if (candidate_scores > current_score).any():
@@ -569,3 +587,15 @@ class Attacker:
 
                 candidate_scores[i] += temp_score
         return candidate_scores, current_score
+
+    def _compute_perplexity(self, input_ids):
+        """
+        Compute mean negative log-likelihood (perplexity proxy) for input_ids.
+        input_ids: torch.Tensor of shape [1, seq_len]
+        """
+        if self.perplexity_model is None or self.perplexity_tokenizer is None:
+            return 0.0
+        with torch.no_grad():
+            outputs = self.perplexity_model(input_ids, labels=input_ids)
+            loss = outputs.loss
+            return loss.item()

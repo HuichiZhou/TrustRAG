@@ -15,7 +15,7 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
-                "--removal_method=perplexity",
+                "--removal_method=drift_perplexity",
                 // "--attack_method=LM_targeted",
                 // "--attack_method=blackbox_hotflip",
                 "--attack_method=hotflip",
@@ -30,7 +30,7 @@
                 "--repeat_times=10",
                 "--adv_per_query=5",
                 "--score_function=dot",
-                "--adv_a_position=end",
+                "--adv_a_position=start",
                 "--use_cache",
                 // "--llm_flag"
             ]
@@ -56,7 +56,7 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "args": [
-                "--method=perplexity",
+                "--method=drift_perplexity",
                 "--eval_dataset=nq",
                 "--eval_model_code=contriever",
             ]
@@ -70,9 +70,7 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "args": [
-                "--logs_dir /home/tom.rahav/TrustRAG/logs",
-                "--output_csv /home/tom.rahav/TrustRAG/notebooks/extracted_analysis_data.csv",
-                "--delete_incomplete"
+                // "--delete_incomplete"
             ]
         },
         {

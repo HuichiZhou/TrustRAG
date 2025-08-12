@@ -98,7 +98,7 @@ class SimilarityScoreAnalyzer:
             part_lower = part.lower()
 
             # Extract attack type (aggd or hotflip)
-            for at in ["aggd", "blackbox_hotflip", "hotflip"]:
+            for at in ["aggd", "hotflip"]:
                 if at in part_lower:
                     attack_type = at
                     break
@@ -220,6 +220,14 @@ class SimilarityScoreAnalyzer:
 
         # Convert to DataFrame for easier analysis
         self.df = pd.DataFrame(self.data)
+
+        if "retriever_type" in self.df.columns:
+            retrievers = [r for r in self.df["retriever_type"].unique() if r != "ance"]
+            retrievers.append("ance")
+            self.df["retriever_type"] = pd.Categorical(
+                self.df["retriever_type"], categories=retrievers, ordered=True
+            )
+
         return self.df
 
     def create_attack_comparison_plots(self, save_plots: bool = True):
@@ -374,14 +382,15 @@ class SimilarityScoreAnalyzer:
             for label, d, color in attack_types:
                 if d.empty:
                     continue
-                sim_vals = np.array(d["similarity_values"].tolist())
-                if sim_vals.size == 0:
+                sim_lists = d["similarity_values"].tolist()
+                # Filter out experiments shorter than 10
+                sim_lists = [vals for vals in sim_lists if len(vals) >= 10]
+                if not sim_lists:
                     continue
-                max_len = max(len(vals) for vals in d["similarity_values"])
+                max_len = max(len(vals) for vals in sim_lists)
                 x_values = np.arange(max_len)
-                # Pad with nan for unequal lengths
-                sim_vals_padded = np.full((len(sim_vals), max_len), np.nan)
-                for i, row in enumerate(sim_vals):
+                sim_vals_padded = np.full((len(sim_lists), max_len), np.nan)
+                for i, row in enumerate(sim_lists):
                     sim_vals_padded[i, : len(row)] = row
                 y_values = np.nanmean(sim_vals_padded, axis=0)
                 y_stds = np.nanstd(sim_vals_padded, axis=0)
@@ -525,7 +534,7 @@ def main():
     parser.add_argument(
         "--drift",
         choices=["truncation", "window", "uniform"],
-        default="window",
+        default="truncation",
         help="Drift method to analyze (truncation, window, uniform)",
     )
 

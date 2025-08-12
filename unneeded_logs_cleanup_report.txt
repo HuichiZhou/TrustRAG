@@ -1,8 +1,0 @@
-TrustRAG Unneeded Logs Cleanup Report
-========================================
-
-Mode: DRY RUN
-Processed folders: 55
-Files deleted: 0
-
-No files were deleted.
