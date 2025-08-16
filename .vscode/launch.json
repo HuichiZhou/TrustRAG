@@ -15,7 +15,7 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
-                "--removal_method=drift_perplexity",
+                "--removal_method=perplexity",
                 // "--attack_method=LM_targeted",
                 // "--attack_method=blackbox_hotflip",
                 "--attack_method=hotflip",
@@ -26,13 +26,15 @@
                 // "--model_name=mistralai/Mistral-Nemo-Instruct-2407",
                 // "--eval_model_code=ance",
                 "--eval_model_code=contriever",
-                "--M=10",
-                "--repeat_times=10",
+                "--M=1",
+                "--repeat_times=1",
                 "--adv_per_query=5",
                 "--score_function=dot",
                 "--adv_a_position=start",
                 "--use_cache",
-                // "--llm_flag"
+                // "--llm_flag",
+                "--lambda_ppl=5",
+                
             ]
         },
         {

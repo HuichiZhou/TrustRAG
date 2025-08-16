@@ -11,7 +11,12 @@ REMOVAL_METHODS = [
     "kmeans_ngram",
     "drift",
     "perplexity",
+    "drift_perplexity",
 ]  #     "kmeans_ngram", "drift", "drift_kmeans_ngram", "perplexity",
+
+REMOVAL_COLORS = dict(
+    zip(REMOVAL_METHODS, sns.color_palette("Set2", n_colors=len(REMOVAL_METHODS)))
+)
 
 
 def parse_log_file(file_path):
@@ -102,7 +107,8 @@ def check_log_completion(file_path):
     Returns True if complete, False if incomplete.
     """
     required_patterns = [
-        r"Total run time for inference, removal and defense: \d+\.\d+",
+        r"Success injection rate in top 5 contents: \d+\.\d+%",
+        # r"Total run time for inference, removal and defense: \d+\.\d+",
         # r"Correct Answer Percentage: \d+\.\d+%",
         # r"Incorrect Answer Percentage: \d+\.\d+%",
         # r"Total run time for inference, removal and defense: \d+\.\d+",
@@ -390,10 +396,7 @@ class ExperimentAnalyzer:
 
     def _get_comparison_palette(self, removal_methods, is_f1_score: bool):
         """Get color palette for comparison plots."""
-        if is_f1_score:
-            base_colors = {"drift": "darkblue", "kmeans_ngram": "darkred"}
-        else:
-            base_colors = {"drift": "skyblue", "kmeans_ngram": "salmon"}
+        base_colors = REMOVAL_COLORS
 
         # Extend with additional colors if needed
         all_colors = list(base_colors.values())
@@ -599,12 +602,7 @@ class ExperimentAnalyzer:
         if len(metrics) == 1:
             axes = [axes]
 
-        colors = {
-            "kmeans_ngram": "darkslateblue",
-            "drift": "darkcyan",
-            "drift_kmeans_ngram": "goldenrod",
-            "perplexity": "lightcoral",
-        }
+        colors = REMOVAL_COLORS
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
@@ -743,12 +741,10 @@ class ExperimentAnalyzer:
         self.calculate_f1_scores()
 
         # Run different analysis sections
-        self.analyze_comparison(
-            attack="hotflip", removal_methods=["drift", "kmeans_ngram", "perplexity"]
-        )
-        self.analyze_single_method(attack="hotflip", removal="all")
-        self.analyze_no_attack()
-        self.analyze_f1_scores()
+        # self.analyze_comparison(attack="hotflip", removal_methods=REMOVAL_METHODS)
+        # self.analyze_single_method(attack="hotflip", removal="all")
+        # self.analyze_no_attack()
+        # self.analyze_f1_scores()
 
         # Create dataset performance barplots
         self.create_dataset_performance_barplots_by_tokens_removed()
@@ -771,6 +767,12 @@ class ExperimentAnalyzer:
             return
 
         filtered_data = self.df[self.df["removal"].isin(REMOVAL_METHODS)].copy()
+        if getattr(self, "drift_apq5_only", False):
+            # Only filter for drift removal
+            mask = (filtered_data["removal"] == "drift") & (
+                filtered_data["adv_per_query"] != 5
+            )
+            filtered_data = filtered_data[~mask]
         if filtered_data.empty:
             print(
                 f"No data available for removal methods: {REMOVAL_METHODS}. Skipping dataset barplots."
@@ -840,12 +842,7 @@ class ExperimentAnalyzer:
                                 score = row[metric].iloc[0] if not row.empty else np.nan
                                 scores_dict[method].append(score)
 
-                        colors = {
-                            "kmeans_ngram": "darkslateblue",
-                            "drift": "darkcyan",
-                            "drift_kmeans_ngram": "goldenrod",
-                            "perplexity": "lightcoral",
-                        }
+                        colors = REMOVAL_COLORS
 
                         for i, method in enumerate(REMOVAL_METHODS):
                             bars = plt.bar(
@@ -932,7 +929,9 @@ class ExperimentAnalyzer:
                         )
 
 
-def analyze_and_visualize(df: pd.DataFrame, output_dir: str = "plots"):
+def analyze_and_visualize(
+    df: pd.DataFrame, output_dir: str = "plots", drift_apq5_only=False
+):
     """
     Main function to analyze and visualize experiment data.
 
@@ -941,6 +940,7 @@ def analyze_and_visualize(df: pd.DataFrame, output_dir: str = "plots"):
         output_dir: Directory to save plots
     """
     analyzer = ExperimentAnalyzer(df, output_dir)
+    analyzer.drift_apq5_only = drift_apq5_only
     analyzer.run_complete_analysis()
     return analyzer.df
 
@@ -965,6 +965,11 @@ def main():
         "--delete_incomplete",
         action="store_true",
         help="Delete incomplete log files (implies --check_incomplete).",
+    )
+    parser.add_argument(
+        "--drift_apq5_only",
+        action="store_true",
+        help="For drift removal, only use data with adv_per_query == 5.",
     )
     args = parser.parse_args()
 
@@ -1014,7 +1019,7 @@ def main():
     df = clean_and_convert_data(df)
 
     # Pass the plot directory to the analysis function
-    analyze_and_visualize(df)
+    analyze_and_visualize(df, output_dir="plots", drift_apq5_only=args.drift_apq5_only)
 
 
 if __name__ == "__main__":

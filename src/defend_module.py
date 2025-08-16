@@ -452,6 +452,9 @@ TRUNCATION_THRESHOLDS = {
                 "cos_sim": {"start": 0.011500000953674316, "end": 0.006900012493133545},
                 "dot": {"start": 8.9462158203125, "end": 3.806195068359375},
             },
+            "msmarco": {
+                "dot": {"start": 8.9462158203125, "end": 3.806195068359375},
+            },
         },
         "contriever": {
             "hotpotqa": {
@@ -757,7 +760,7 @@ PERPLEXITY_THRESHOLDS = {
             "hotpotqa": {"dot": 2.910708451271057},
             "mirage": {"dot": 2.776334488391876},
             "nq": {"dot": 2.799725687503815},
-            "msmarco": {"dot": 0},
+            "msmarco": {"dot": 3.406},
         },
         "contriever": {
             "hotpotqa": {"dot": 3.122442638874054},
@@ -778,7 +781,7 @@ PERPLEXITY_THRESHOLDS = {
             "hotpotqa": {"dot": 2.6476390600204467},
             "mirage": {"dot": 2.7321505308151246},
             "nq": {"dot": 2.571706938743591},
-            "msmarco": {"dot": 0},
+            "msmarco": {"dot": 3.09},
         },
         "contriever": {
             "hotpotqa": {"dot": 2.799322819709778},
@@ -799,7 +802,7 @@ PERPLEXITY_THRESHOLDS = {
             "hotpotqa": {"dot": 2.486900770664215},
             "mirage": {"dot": 2.706580603122711},
             "nq": {"dot": 2.407020854949951},
-            "msmarco": {"dot": 0},
+            "msmarco": {"dot": 2.90},
         },
         "contriever": {
             "hotpotqa": {"dot": 2.598045587539673},
@@ -815,9 +818,65 @@ PERPLEXITY_THRESHOLDS = {
         },
     },
 }
+# TODO Remove
+DRIFT_PERPLEXITY_THRESHOLDS_MULT = 1.1
+DRIFT_PERPLEXITY_THRESHOLDS = {
+    95: {
+        "ance": {
+            "hotpotqa": {"dot": {"start": 1.57, "end": 1.49}},
+            "mirage": {"dot": {"start": 0.5, "end": 0.2}},
+            "nq": {"dot": {"start": 1.33, "end": 1.14}},
+            "msmarco": {"dot": {"start": 1.92, "end": 1.57}},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": {"start": 1.26, "end": 1.20}},
+            "mirage": {"dot": {"start": 0.42, "end": 0.32}},
+            "nq": {"dot": {"start": 1.26, "end": 1.23}},
+            "msmarco": {"dot": {"start": 1.83, "end": 1.64}},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": {"start": 1.64, "end": 1.69}},
+            "mirage": {"dot": {"start": 0.57, "end": 0.29}},
+            "nq": {"dot": {"start": 1.43, "end": 1.39}},
+            "msmarco": {"dot": {"start": 1.91, "end": 1.53}},
+        },
+    },
+}
 
 
-def get_thresholds_perplexity(model_code, dataset, score_function, percentile=95):
+def get_thresholds_drift_perplexity(model_code, dataset, score_function, percentile=95):
+    """
+    Get perplexity thresholds for given model, dataset, score function, and percentile.
+
+    Args:
+        model_code: Model identifier (e.g., "ance", "contriever")
+        dataset: Dataset name (e.g., "hotpotqa", "mirage")
+        score_function: Scoring function ("cos_sim" or "dot")
+        percentile: Which percentile to use (90 or 95)
+
+    Returns:
+        float: Perplexity threshold
+
+    Raises:
+        ValueError: If configuration not found
+    """
+    try:
+        threshold_dict = DRIFT_PERPLEXITY_THRESHOLDS[percentile]
+        model_config = threshold_dict[model_code]
+        dataset_config = model_config[dataset]
+        score_config = dataset_config[score_function]
+        return (
+            score_config["start"] * DRIFT_PERPLEXITY_THRESHOLDS_MULT,
+            score_config["end"] * DRIFT_PERPLEXITY_THRESHOLDS_MULT,
+        )
+    except KeyError:
+        available_configs = []
+        if model_code in threshold_dict:
+            for ds in threshold_dict[model_code]:
+                available_configs.append(f"{model_code}/{ds}/{score_function}")
+
+
+def get_thresholds_perplexity(model_code, dataset, score_function, percentile=85):
     """
     Get perplexity thresholds for given model, dataset, score function, and percentile.
 
@@ -1909,7 +1968,7 @@ def drift_filtering_perplexity(
     Returns:
         filtered_contents: List of passages passing the drift filter.
     """
-    threshold_start, threshold_end = get_thresholds_truncation(
+    threshold_start, threshold_end = get_thresholds_drift_perplexity(
         args.eval_model_code,
         args.eval_dataset,
         args.score_function,

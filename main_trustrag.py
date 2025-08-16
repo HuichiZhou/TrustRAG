@@ -168,12 +168,13 @@ def main():
     device = "cuda"
     setup_seeds(args.seed)
 
-    # load embedding model
-    embedding_model_name = "princeton-nlp/sup-simcse-bert-base-uncased"
-    embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
-    embedding_model = AutoModel.from_pretrained(embedding_model_name).cuda()
-    embedding_model.cuda()
-    embedding_model.eval()
+    if "kmeans" in args.removal_method:
+        # load embedding model
+        embedding_model_name = "princeton-nlp/sup-simcse-bert-base-uncased"
+        embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
+        embedding_model = AutoModel.from_pretrained(embedding_model_name).cuda()
+        embedding_model.cuda()
+        embedding_model.eval()
 
     # load target queries and answers
     if args.eval_dataset == "msmarco":
@@ -271,10 +272,10 @@ def main():
                 get_emb=get_emb,
                 # Pass perplexity model, tokenizer, and lambda_ppl to attacker
                 perplexity_model=(
-                    perp_model if args.removal_method == "perplexity" else None
+                    perp_model if "perplexity" in args.removal_method else None
                 ),
                 perplexity_tokenizer=(
-                    perp_tokenizer if args.removal_method == "perplexity" else None
+                    perp_tokenizer if "perplexity" in args.removal_method else None
                 ),
                 lambda_ppl=getattr(args, "lambda_ppl", 0.0),
             )
@@ -409,6 +410,7 @@ def main():
                             i,
                             perp_tokenizer,
                             perp_model,
+                            args.num_tokens_to_remove,
                         )
                     elif "drift" in args.removal_method:
                         if "window" in args.removal_method:
@@ -516,7 +518,7 @@ def main():
     save_outputs(sorted_contents, args.log_name, "sorted_contents")
     save_outputs(top_ks, args.log_name, "top_ks")
     save_outputs(questions, args.log_name, "questions")
-    if args.removal_method == "perplexity":
+    if "perplexity" in args.removal_method:
         # make sure perp_model and perp_tokenizer are loaded
         assert perp_model is not None, "Perplexity model is not loaded."
         assert perp_tokenizer is not None, "Perplexity tokenizer is not loaded."
@@ -541,7 +543,10 @@ def main():
             logger.info("Using {} as the LLM model".format(args.model_name))
             backend_config = TurbomindEngineConfig(
                 tp=1,
-                session_len=16084,
+                session_len=int(1024 * 2),
+                cache_max_entry_count=0.5,  # Use less KV cache
+                cache_block_seq_len=64,  # Smaller cache blocks
+                enable_prefix_caching=False,  # Disable prefix caching
             )
             sampling_params = GenerationConfig(temperature=0.01, max_new_tokens=1024)
             llm = pipeline(args.model_name, backend_config)

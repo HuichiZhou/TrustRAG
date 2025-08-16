@@ -8,7 +8,6 @@ import torch
 from src.utils import load_beir_datasets, load_cached_data, load_models, save_outputs
 from src.defend_module import drift_filtering_question_aware
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from src.defend_module import PerplexityFilter
 
 
 def parse_args():
@@ -77,21 +76,21 @@ def main():
 
     # Run filtering based on the selected method
     if args.method == "drift":
-        total_removed = 0
-        total_queries = 0
-        drift_diffs = []
-        diff_start_all = []
-        diff_end_all = []
-
+        drift_start_all = []
+        drift_end_all = []
+        i = 0
         for query_id, topk_dict in tqdm(
             results.items(), desc=f"Evaluating {args.method} impact"
         ):
+            i += 1
+            if i % 1000 == 0:
+                break
             question = queries[query_id]
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
 
             try:
-                filtered_docs, diff_start, diff_end = drift_filtering_question_aware(
+                _, diff_start, diff_end = drift_filtering_question_aware(
                     args=log_args,
                     tokenizer=tokenizer,
                     model=model,
@@ -104,29 +103,30 @@ def main():
                 print(f"Skipping {query_id} due to error: {e}")
                 continue
 
-            removed = len(set(original_docs) - set(filtered_docs))
-            drift_diffs.append(removed)
-            diff_start_all = np.concatenate((diff_start_all, diff_start))
-            diff_end_all = np.concatenate((diff_end_all, diff_end))
-            total_removed += removed
-            total_queries += 1
+            drift_start_all = np.concatenate((drift_start_all, diff_start))
+            drift_end_all = np.concatenate((drift_end_all, diff_end))
 
-        # Report
-        avg_removed = total_removed / total_queries if total_queries > 0 else 0
-        print("\n[Contriever Drift Filter Summary]")
-        print(f"Total queries processed: {total_queries}")
-        print(
-            f"Average documents removed by drift: {avg_removed:.2f} out of top-{args.top_k}"
+        drift_start_all = np.array(drift_start_all)
+        drift_start_all = drift_start_all[~np.isnan(drift_start_all)]
+        drift_end_all = np.array(drift_end_all)
+        drift_end_all = drift_end_all[~np.isnan(drift_end_all)]
+
+        percentiles = [95, 90, 85]
+        thresh_start = np.percentile(drift_start_all, percentiles)
+        thresh_end = np.percentile(drift_end_all, percentiles)
+        for pct, t_start, t_end in zip(percentiles, thresh_start, thresh_end):
+            print(f"{pct}th percentile drift (start): {t_start:.4f}")
+            print(f"{pct}th percentile drift (end): {t_end:.4f}")
+
+        save_outputs(
+            thresh_start,
+            log_args.log_name,
+            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_start",
         )
         save_outputs(
-            diff_start_all,
+            thresh_end,
             log_args.log_name,
-            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-diff_start_all",
-        )
-        save_outputs(
-            diff_end_all,
-            log_args.log_name,
-            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-diff_end_all",
+            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_end",
         )
     elif args.method == "perplexity":
         # You may want to add these as arguments
@@ -146,6 +146,8 @@ def main():
             results.items(), desc="Calculating NLLs for perplexity threshold"
         ):
             i += 1
+            if i % 1000 == 0:
+                break
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
 
@@ -201,8 +203,8 @@ def main():
             results.items(), desc="Calculating drift perplexity scores"
         ):
             i += 1
-            # if i % 100 == 0:
-            #     break
+            if i % 1000 == 0:
+                break
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
 
@@ -261,7 +263,11 @@ def main():
                 all_drift_scores_end.append(drift_score_end)
 
         all_drift_scores_start = np.array(all_drift_scores_start)
+        all_drift_scores_start = all_drift_scores_start[
+            ~np.isnan(all_drift_scores_start)
+        ]
         all_drift_scores_end = np.array(all_drift_scores_end)
+        all_drift_scores_end = all_drift_scores_end[~np.isnan(all_drift_scores_end)]
         percentiles = [95, 90, 85]
         thresh_start = np.percentile(all_drift_scores_start, percentiles)
         thresh_end = np.percentile(all_drift_scores_end, percentiles)

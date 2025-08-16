@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('nq' 'hotpotqa' 'msmarco' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
-eval_models_names=("contriever" "contriever-ms" "ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
+datasets=('msmarco') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+eval_models_names=("ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
 scores=('dot') # 'dot' 'cos_sim'
-methods=('drift_perplexity') # 'drift' 'perplexity'
+methods=('drift') # 'drift' 'perplexity'
 topks=(20) # 5 10 20
 
 index=1  # Initialize counter
