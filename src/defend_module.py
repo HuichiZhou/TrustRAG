@@ -483,6 +483,7 @@ TRUNCATION_THRESHOLDS = {
                 "cos_sim": {"start": 0.5046700000762937, "end": 0.33633998036384527},
                 "dot": {"start": 1.0324800491333004, "end": 0.5676999092102051},
             },
+            "msmarco":{"dot":{"start": 0.9171, "end": 0.3520}}
         },
         "minilm": {
             "hotpotqa": {
