@@ -453,7 +453,7 @@ TRUNCATION_THRESHOLDS = {
                 "dot": {"start": 8.9462158203125, "end": 3.806195068359375},
             },
             "msmarco": {
-                "dot": {"start": 8.9462158203125, "end": 3.806195068359375},
+                "dot": {"start": 8.90, "end": 2.23},
             },
         },
         "contriever": {

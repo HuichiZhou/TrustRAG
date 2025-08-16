@@ -2,7 +2,7 @@
 
 # Define arrays of parameters 
 datasets=('msmarco') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
-eval_models_names=("ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
+eval_models_names=("contriever-ms") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
 scores=('dot') # 'dot' 'cos_sim'
 methods=('drift') # 'drift' 'perplexity'
 topks=(20) # 5 10 20
