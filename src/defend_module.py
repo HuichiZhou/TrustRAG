@@ -920,7 +920,7 @@ def get_thresholds_drift_perplexity(model_code, dataset, score_function, percent
 
 
 def get_thresholds_perplexity(
-    model_code, dataset, score_function, perp_model_name, percentile=85
+    model_code, dataset, score_function, perp_model_name, percentile=99
 ):
     """
     Get perplexity thresholds for given model, dataset, score function, and percentile.
@@ -942,7 +942,7 @@ def get_thresholds_perplexity(
         threshold_dict = perp_model_config[percentile]
         model_config = threshold_dict[model_code]
         dataset_config = model_config[dataset]
-        return dataset_config[score_function] * 0.75
+        return dataset_config[score_function]
     except KeyError:
         available_configs = []
         if model_code in threshold_dict:

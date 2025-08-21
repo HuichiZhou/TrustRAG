@@ -160,13 +160,13 @@ def main():
             diff = np.max(self_scores, axis=1) - np.min(self_scores, axis=1)
             drift_all = np.concatenate((drift_all, diff))
 
-        drift_all = np.array(drift_start_all)
-        drift_all = drift_start_all[~np.isnan(drift_start_all)]
+        drift_all = np.array(drift_all)
+        drift_all = drift_all[~np.isnan(drift_all)]
 
         percentiles = [99, 95, 90, 85]
         thresh = np.percentile(drift_all, percentiles)
-        for pct, t_start, t_end in zip(percentiles, thresh):
-            print(f"{pct}th percentile drift (end): {thresh:.4f}")
+        for pct, thr in zip(percentiles, thresh):
+            print(f"{pct}th percentile drift (end): {thr:.4f}")
 
         save_outputs(
             thresh,
@@ -192,7 +192,7 @@ def main():
             results.items(), desc="Calculating NLLs for perplexity threshold"
         ):
             i += 1
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 break
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]

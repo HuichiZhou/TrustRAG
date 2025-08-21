@@ -348,9 +348,7 @@ class ExperimentAnalyzer:
 
         if comparison_mode and "removal" in data.columns:
             # Comparison plot with hue
-            palette = self._get_comparison_palette(
-                data["removal"].unique(), is_f1_score
-            )
+            palette = REMOVAL_COLORS
             sns.barplot(
                 x="plot_specific_display_group",
                 y=metric,
