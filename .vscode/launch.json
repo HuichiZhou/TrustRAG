@@ -15,26 +15,26 @@
             "args": [
                 "--log_name=test-llama",
                 "--eval_dataset=nq",
-                "--removal_method=drift_perplexity",
+                "--removal_method=perplexity",
                 // "--attack_method=LM_targeted",
                 // "--attack_method=blackbox_hotflip",
                 "--attack_method=hotflip",
                 // "--attack_method=aggd",
                 "--defend_method=none",
                 // "--model_name=gpt-4o",
-                "--model_name=meta-llama/Llama-3.1-8B-Instruct",
+                // "--model_name=meta-llama/Llama-3.1-8B-Instruct",
+                "--model_name=meta-llama/Llama-2-7b-chat-hf",
                 // "--model_name=mistralai/Mistral-Nemo-Instruct-2407",
                 // "--eval_model_code=ance",
                 "--eval_model_code=contriever",
-                "--M=5",
-                "--repeat_times=1",
+                "--M=10",
+                "--repeat_times=10",
                 "--adv_per_query=5",
                 "--score_function=dot",
                 "--adv_a_position=start",
                 "--use_cache",
                 // "--llm_flag",
-                "--lambda_ppl=5",
-                
+                // "--lambda_ppl=5",
             ]
         },
         {
@@ -58,9 +58,10 @@
             "console": "integratedTerminal",
             // "justMyCode": false,
             "args": [
-                "--method=drift_perplexity",
+                "--method=perplexity",
                 "--eval_dataset=nq",
                 "--eval_model_code=contriever",
+                "--top_k=20"
             ]
         },
         {

@@ -67,6 +67,7 @@ def parse_log_file(file_path):
                 "no_questions": r"no_questions",
                 "both_sides": r"both_sides",
                 "num_tokens_removed": r"-num_tokens_removed_(\d+)",
+                "lambda_ppl": r"-lambda_ppl_(\d+)",
             }
             for key, pattern in patterns.items():
                 match = re.search(pattern, experiment_name)
@@ -305,7 +306,10 @@ class ExperimentAnalyzer:
             data = data[data["removal"].isin(removal_filter)]
         if self.has_retriever and retriever_val:
             data = data[data["retriver"] == retriever_val]
-
+        if getattr(self, "drift_apq5_only", False):
+            # Only filter for drift removal
+            mask = (data["removal"] == "drift") & (data["adv_per_query"] != 5)
+            data = data[~mask]
         # Sort data
         sort_keys = ["adv_per_query", "score", "dataset", "model", "adv_a_position"]
         if self.has_retriever:
@@ -661,8 +665,8 @@ class ExperimentAnalyzer:
             fontweight="bold",
         )
 
-        # Add legend to the first subplot
-        axes[0].legend()
+        # Create a single legend for the entire figure
+        fig.legend(loc="upper left", bbox_to_anchor=(0.5, 0.95), ncol=3)
 
         plt.tight_layout()
 
@@ -741,10 +745,10 @@ class ExperimentAnalyzer:
         self.calculate_f1_scores()
 
         # Run different analysis sections
-        # self.analyze_comparison(attack="hotflip", removal_methods=REMOVAL_METHODS)
-        # self.analyze_single_method(attack="hotflip", removal="all")
-        # self.analyze_no_attack()
-        # self.analyze_f1_scores()
+        self.analyze_comparison(attack="hotflip", removal_methods=REMOVAL_METHODS)
+        self.analyze_single_method(attack="hotflip", removal="all")
+        self.analyze_no_attack()
+        self.analyze_f1_scores()
 
         # Create dataset performance barplots
         self.create_dataset_performance_barplots_by_tokens_removed()

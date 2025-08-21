@@ -483,7 +483,7 @@ TRUNCATION_THRESHOLDS = {
                 "cos_sim": {"start": 0.5046700000762937, "end": 0.33633998036384527},
                 "dot": {"start": 1.0324800491333004, "end": 0.5676999092102051},
             },
-            "msmarco":{"dot":{"start": 0.9171, "end": 0.3520}}
+            "msmarco": {"dot": {"start": 0.9171, "end": 0.3520}},
         },
         "minilm": {
             "hotpotqa": {
@@ -756,71 +756,113 @@ TRUNCATION_THRESHOLDS = {
 
 # Thresholds based on quantiles
 PERPLEXITY_THRESHOLDS = {
-    95: {
-        "ance": {
-            "hotpotqa": {"dot": 2.910708451271057},
-            "mirage": {"dot": 2.776334488391876},
-            "nq": {"dot": 2.799725687503815},
-            "msmarco": {"dot": 3.406},
+    "meta-llama/Llama-3.1-8B-Instruct": {
+        95: {
+            "ance": {
+                "hotpotqa": {"dot": 2.910708451271057},
+                "mirage": {"dot": 2.776334488391876},
+                "nq": {"dot": 2.799725687503815},
+                "msmarco": {"dot": 3.406},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 3.122442638874054},
+                "mirage": {"dot": 2.9518614649772643},
+                "nq": {"dot": 3.0446754932403564},
+                "msmarco": {"dot": 3.4049797654151894},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 2.941780900955199},
+                "mirage": {"dot": 2.85638724565506},
+                "nq": {"dot": 2.993280267715454},
+                "msmarco": {"dot": 3.409883868694305},
+            },
         },
-        "contriever": {
-            "hotpotqa": {"dot": 3.122442638874054},
-            "mirage": {"dot": 2.9518614649772643},
-            "nq": {"dot": 3.0446754932403564},
-            "msmarco": {"dot": 3.4049797654151894},
+        # Thresholds based on 10th highest quantile (90th percentile)
+        90: {
+            "ance": {
+                "hotpotqa": {"dot": 2.6476390600204467},
+                "mirage": {"dot": 2.7321505308151246},
+                "nq": {"dot": 2.571706938743591},
+                "msmarco": {"dot": 3.09},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 2.799322819709778},
+                "mirage": {"dot": 2.8674068450927734},
+                "nq": {"dot": 2.7829957008361816},
+                "msmarco": {"dot": 3.0381710767745975},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 2.6698628425598145},
+                "mirage": {"dot": 2.7833786725997927},
+                "nq": {"dot": 2.728618454933167},
+                "msmarco": {"dot": 3.124883604049683},
+            },
         },
-        "contriever-ms": {
-            "hotpotqa": {"dot": 2.941780900955199},
-            "mirage": {"dot": 2.85638724565506},
-            "nq": {"dot": 2.993280267715454},
-            "msmarco": {"dot": 3.409883868694305},
+        # Thresholds based on 15th highest quantile (85th percentile)
+        85: {
+            "ance": {
+                "hotpotqa": {"dot": 2.486900770664215},
+                "mirage": {"dot": 2.706580603122711},
+                "nq": {"dot": 2.407020854949951},
+                "msmarco": {"dot": 2.90},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 2.598045587539673},
+                "mirage": {"dot": 2.800379252433777},
+                "nq": {"dot": 2.6037054300308227},
+                "msmarco": {"dot": 2.827660381793976},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 2.48363116979599},
+                "mirage": {"dot": 2.733857703208923},
+                "nq": {"dot": 2.5481189131736754},
+                "msmarco": {"dot": 2.936501622200012},
+            },
         },
     },
-    # Thresholds based on 10th highest quantile (90th percentile)
-    90: {
-        "ance": {
-            "hotpotqa": {"dot": 2.6476390600204467},
-            "mirage": {"dot": 2.7321505308151246},
-            "nq": {"dot": 2.571706938743591},
-            "msmarco": {"dot": 3.09},
+    "meta-llama/Llama-2-7b-chat-hf": {
+        95: {
+            "ance": {
+                "hotpotqa": {"dot": 7.08},
+                "mirage": {"dot": 5.68},
+                "msmarco": {"dot": 6.82},
+                "nq": {"dot": 7.42},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 7.74},
+                "mirage": {"dot": 6.02},
+                "msmarco": {"dot": 7.01},
+                "nq": {"dot": 7.72},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 7.31},
+                "mirage": {"dot": 5.95},
+                "msmarco": {"dot": 6.81},
+                "nq": {"dot": 7.64},
+            },
         },
-        "contriever": {
-            "hotpotqa": {"dot": 2.799322819709778},
-            "mirage": {"dot": 2.8674068450927734},
-            "nq": {"dot": 2.7829957008361816},
-            "msmarco": {"dot": 3.0381710767745975},
-        },
-        "contriever-ms": {
-            "hotpotqa": {"dot": 2.6698628425598145},
-            "mirage": {"dot": 2.7833786725997927},
-            "nq": {"dot": 2.728618454933167},
-            "msmarco": {"dot": 3.124883604049683},
-        },
-    },
-    # Thresholds based on 15th highest quantile (85th percentile)
-    85: {
-        "ance": {
-            "hotpotqa": {"dot": 2.486900770664215},
-            "mirage": {"dot": 2.706580603122711},
-            "nq": {"dot": 2.407020854949951},
-            "msmarco": {"dot": 2.90},
-        },
-        "contriever": {
-            "hotpotqa": {"dot": 2.598045587539673},
-            "mirage": {"dot": 2.800379252433777},
-            "nq": {"dot": 2.6037054300308227},
-            "msmarco": {"dot": 2.827660381793976},
-        },
-        "contriever-ms": {
-            "hotpotqa": {"dot": 2.48363116979599},
-            "mirage": {"dot": 2.733857703208923},
-            "nq": {"dot": 2.5481189131736754},
-            "msmarco": {"dot": 2.936501622200012},
+        85: {
+            "ance": {
+                "hotpotqa": {"dot": 6.02},
+                "mirage": {"dot": 5.01},
+                "msmarco": {"dot": 6.27},
+                "nq": {"dot": 6.85},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 7.12},
+                "mirage": {"dot": 5.46},
+                "msmarco": {"dot": 6.35},
+                "nq": {"dot": 7.02},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 6.71},
+                "mirage": {"dot": 5.34},
+                "msmarco": {"dot": 6.23},
+                "nq": {"dot": 6.81},
+            },
         },
     },
 }
-# TODO Remove
-DRIFT_PERPLEXITY_THRESHOLDS_MULT = 1.1
 DRIFT_PERPLEXITY_THRESHOLDS = {
     95: {
         "ance": {
@@ -867,8 +909,8 @@ def get_thresholds_drift_perplexity(model_code, dataset, score_function, percent
         dataset_config = model_config[dataset]
         score_config = dataset_config[score_function]
         return (
-            score_config["start"] * DRIFT_PERPLEXITY_THRESHOLDS_MULT,
-            score_config["end"] * DRIFT_PERPLEXITY_THRESHOLDS_MULT,
+            score_config["start"],
+            score_config["end"],
         )
     except KeyError:
         available_configs = []
@@ -877,7 +919,9 @@ def get_thresholds_drift_perplexity(model_code, dataset, score_function, percent
                 available_configs.append(f"{model_code}/{ds}/{score_function}")
 
 
-def get_thresholds_perplexity(model_code, dataset, score_function, percentile=85):
+def get_thresholds_perplexity(
+    model_code, dataset, score_function, perp_model_name, percentile=85
+):
     """
     Get perplexity thresholds for given model, dataset, score function, and percentile.
 
@@ -894,10 +938,11 @@ def get_thresholds_perplexity(model_code, dataset, score_function, percentile=85
         ValueError: If configuration not found
     """
     try:
-        threshold_dict = PERPLEXITY_THRESHOLDS[percentile]
+        perp_model_config = PERPLEXITY_THRESHOLDS[perp_model_name]
+        threshold_dict = perp_model_config[percentile]
         model_config = threshold_dict[model_code]
         dataset_config = model_config[dataset]
-        return dataset_config[score_function]
+        return dataset_config[score_function] * 0.75
     except KeyError:
         available_configs = []
         if model_code in threshold_dict:
@@ -928,7 +973,10 @@ def get_thresholds_truncation(model_code, dataset, score_function, percentile=95
         model_config = threshold_dict[model_code]
         dataset_config = model_config[dataset]
         score_config = dataset_config[score_function]
-        return score_config["start"], score_config["end"]
+        return (
+            score_config["start"],
+            score_config["end"],
+        )
     except KeyError:
         available_configs = []
         if model_code in threshold_dict:
@@ -1329,14 +1377,14 @@ def drift_filtering_uniform(
     self_mask = diff_scores_mask(self_scores, threshold=thresh)
 
     # Optionally, save the self-similarity scores to a file
-    save_outputs(
-        self_similarity_scores,
-        args.log_name,
-        f"sample_{iter_idx}_self_similarity_scores_uniform",
-    )
+    # save_outputs(
+    #     self_similarity_scores,
+    #     args.log_name,
+    #     f"sample_{iter_idx}_self_similarity_scores_uniform",
+    # )
     topk_contents = contents
     topk_contents = [t for t, m in zip(topk_contents, self_mask) if m]
-    return topk_contents
+    return topk_contents, self_scores
 
 
 def drift_filtering_question_aware(
@@ -1931,7 +1979,10 @@ def perplexity_filtering(
         perp_model,
         perp_tokenizer,
         get_thresholds_perplexity(
-            args.eval_model_code, args.eval_dataset, args.score_function
+            args.eval_model_code,
+            args.eval_dataset,
+            args.score_function,
+            args.model_name,
         ),
         window_size,
     )

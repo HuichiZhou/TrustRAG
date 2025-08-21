@@ -426,7 +426,7 @@ def main():
                                 is_attack_list,
                             )
                         elif "uniform" in args.removal_method:
-                            topk_contents = drift_filtering_uniform(
+                            topk_contents, _ = drift_filtering_uniform(
                                 args,
                                 tokenizer,
                                 model,
@@ -543,7 +543,7 @@ def main():
             logger.info("Using {} as the LLM model".format(args.model_name))
             backend_config = TurbomindEngineConfig(
                 tp=1,
-                session_len=int(1024 * 2),
+                session_len=int(1024 * 4),
                 cache_max_entry_count=0.5,  # Use less KV cache
                 cache_block_seq_len=64,  # Smaller cache blocks
                 enable_prefix_caching=False,  # Disable prefix caching

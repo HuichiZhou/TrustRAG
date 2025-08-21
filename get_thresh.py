@@ -6,7 +6,7 @@ from tqdm import tqdm
 import torch
 
 from src.utils import load_beir_datasets, load_cached_data, load_models, save_outputs
-from src.defend_module import drift_filtering_question_aware
+from src.defend_module import drift_filtering_question_aware, drift_filtering_uniform
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument(
         "--method",
         type=str,
-        choices=["drift", "perplexity", "drift_perplexity"],
+        choices=["drift", "drift_uniform", "perplexity", "drift_perplexity"],
         required=True,
         help="Filtering method to use",
     )
@@ -61,7 +61,7 @@ def main():
     )
 
     log_args = SimpleNamespace(
-        log_name=f"extract_val_{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}_{args.method}",
+        log_name=f"temp_extract_val_{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}_{args.method}",
         score_function=args.score_function,
     )
 
@@ -128,10 +128,56 @@ def main():
             log_args.log_name,
             f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_end",
         )
+    elif args.method == "drift_uniform":
+        # Implement drift uniform filtering
+        drift_all = []
+        i = 0
+        for query_id, topk_dict in tqdm(
+            results.items(), desc=f"Evaluating {args.method} impact"
+        ):
+            i += 1
+            if i % 1000 == 0:
+                break
+            question = queries[query_id]
+            topk_indices = list(topk_dict.keys())[: args.top_k]
+            original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
+
+            try:
+                _, self_scores = drift_filtering_uniform(
+                    args=args,
+                    tokenizer=tokenizer,
+                    model=model,
+                    get_emb=get_emb,
+                    question=question,
+                    contents=original_docs,
+                    iter_idx=i,
+                    num_tokens_to_remove=30,
+                    is_attack_list=[1 for _ in range(len(original_docs))],
+                )
+            except Exception as e:
+                print(f"Skipping {query_id} due to error: {e}")
+                continue
+            diff = np.max(self_scores, axis=1) - np.min(self_scores, axis=1)
+            drift_all = np.concatenate((drift_all, diff))
+
+        drift_all = np.array(drift_start_all)
+        drift_all = drift_start_all[~np.isnan(drift_start_all)]
+
+        percentiles = [99, 95, 90, 85]
+        thresh = np.percentile(drift_all, percentiles)
+        for pct, t_start, t_end in zip(percentiles, thresh):
+            print(f"{pct}th percentile drift (end): {thresh:.4f}")
+
+        save_outputs(
+            thresh,
+            log_args.log_name,
+            f"{args.eval_dataset}-{split}-{args.eval_model_code}-{args.score_function}-{args.top_k}-drift_uniform",
+        )
+
     elif args.method == "perplexity":
         # You may want to add these as arguments
         gen_model_name = "meta-llama/Llama-3.1-8B-Instruct"
-
+        # gen_model_name = "meta-llama/Llama-2-7b-chat-hf"
         print(f"Loading generation model: {gen_model_name}")
         gen_tokenizer = AutoTokenizer.from_pretrained(gen_model_name)
         gen_tokenizer.pad_token = gen_tokenizer.eos_token
@@ -146,7 +192,7 @@ def main():
             results.items(), desc="Calculating NLLs for perplexity threshold"
         ):
             i += 1
-            if i % 1000 == 0:
+            if i % 100 == 0:
                 break
             topk_indices = list(topk_dict.keys())[: args.top_k]
             original_docs = [corpus[doc_id]["text"] for doc_id in topk_indices]
@@ -168,13 +214,14 @@ def main():
                     losses = losses.view(shift_labels.size())
                     nlls = losses.mean(dim=1).cpu().numpy()
                     all_nlls.extend(nlls)
+                    del logits
             except Exception as e:
                 print(f"Skipping {query_id} due to error: {e}")
                 continue
 
         all_nlls = np.array(all_nlls)
         print(f"\nCollected {len(all_nlls)} NLL values.")
-        percentiles = [95, 90, 85]
+        percentiles = [99.5, 99, 95, 90, 85]
         all_threshs = np.percentile(all_nlls, percentiles)
         for pct, thresh in zip(percentiles, all_threshs):
             print(f"{pct}th percentile NLL: {thresh:.4f}")

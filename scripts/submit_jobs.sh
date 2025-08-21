@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('msmarco') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
-models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o"
-eval_models_names=("contriever-ms") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
-attacks=("hotflip" "aggd" "blackbox_hotflip") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"
-removals=('drift' 'kmeans_ngram') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram' 'perplexity'
+datasets=('nq' 'hotpotqa' 'msmarco' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o" "meta-llama/Llama-2-7b-chat-hf"
+eval_models_names=("contriever" "contriever-ms" "ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
+attacks=("hotflip" "aggd") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"
+removals=('drift_perplexity') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_kmeans_ngram' 'perplexity'
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('dot') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'
