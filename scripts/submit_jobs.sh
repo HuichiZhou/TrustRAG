@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define arrays of parameters 
-datasets=('nq' 'hotpotqa' 'msmarco' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
+datasets=('nq' 'hotpotqa' 'mirage') # 'nq' 'hotpotqa' 'msmarco' 'mirage'
 models_names=("meta-llama/Llama-3.1-8B-Instruct") # "mistralai/Mistral-Nemo-Instruct-2407" "meta-llama/Llama-3.1-8B-Instruct" "gpt-4o" "meta-llama/Llama-2-7b-chat-hf"
 eval_models_names=("contriever" "contriever-ms" "ance") # "contriever" "contriever-ms" "ance" "minilm" "mpnet" "roberta"
 attacks=("hotflip" "aggd") # "none" "LM_targeted" "pia" "hotflip" "aggd" "blackbox_hotflip"

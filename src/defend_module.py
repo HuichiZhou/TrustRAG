@@ -438,6 +438,50 @@ WINDOW_THRESHOLDS = {
     }
 }
 
+UNIFORM_THRESHOLDS = {
+    # Thresholds based on 5th highest quantile (95th percentile)
+    99: {
+        "ance": {
+            "hotpotqa": {"dot": 22.99},
+            "mirage": {"dot": 16.50},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 21.70},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 3.506},
+            "mirage": {"dot": 4.03},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 3.14},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 2.971},
+            "mirage": {"dot": 3.03},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 2.71},
+        },
+    },
+    95: {
+        "ance": {
+            "hotpotqa": {"dot": 17.86},
+            "mirage": {"dot": 12.37},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 16.41},
+        },
+        "contriever": {
+            "hotpotqa": {"dot": 3.00},
+            "mirage": {"dot": 3.71},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 2.68},
+        },
+        "contriever-ms": {
+            "hotpotqa": {"dot": 2.606},
+            "mirage": {"dot": 2.66},
+            "msmarco": {"dot": 0},
+            "nq": {"dot": 2.30},
+        },
+    },
+}
+
 # Thresholds based on quantiles
 TRUNCATION_THRESHOLDS = {
     # Thresholds based on 5th highest quantile (95th percentile)
@@ -757,6 +801,26 @@ TRUNCATION_THRESHOLDS = {
 # Thresholds based on quantiles
 PERPLEXITY_THRESHOLDS = {
     "meta-llama/Llama-3.1-8B-Instruct": {
+        99: {
+            "ance": {
+                "hotpotqa": {"dot": 3.50},
+                "mirage": {"dot": 3.17},
+                "msmarco": {"dot": 0},
+                "nq": {"dot": 3.36},
+            },
+            "contriever": {
+                "hotpotqa": {"dot": 3.73},
+                "mirage": {"dot": 3.19},
+                "msmarco": {"dot": 0},
+                "nq": {"dot": 3.65},
+            },
+            "contriever-ms": {
+                "hotpotqa": {"dot": 3.45},
+                "mirage": {"dot": 3.03},
+                "msmarco": {"dot": 0},
+                "nq": {"dot": 3.547},
+            },
+        },
         95: {
             "ance": {
                 "hotpotqa": {"dot": 2.910708451271057},
@@ -1008,6 +1072,41 @@ def get_thresholds_window(model_code, dataset, score_function, percentile=95):
     """
     try:
         threshold_dict = WINDOW_THRESHOLDS[percentile]
+        model_config = threshold_dict[model_code]
+        dataset_config = model_config[dataset]
+        score_config = dataset_config[score_function]
+        return score_config
+    except KeyError:
+        available_configs = []
+        if model_code in threshold_dict:
+            for ds in threshold_dict[model_code]:
+                for sf in threshold_dict[model_code][ds]:
+                    available_configs.append(f"{model_code}/{ds}/{sf}")
+
+        raise ValueError(
+            f"No {percentile} percentile threshold configuration found for {model_code}/{dataset}/{score_function}. "
+            f"Available configurations: {available_configs}"
+        )
+
+
+def get_thresholds_uniform(model_code, dataset, score_function, percentile=95):
+    """
+    Get thresholds for given model, dataset, score function, and percentile.
+
+    Args:
+        model_code: Model identifier (e.g., "ance", "contriever")
+        dataset: Dataset name (e.g., "hotpotqa", "mirage")
+        score_function: Scoring function ("cos_sim" or "dot")
+        percentile: Which percentile to use (90 or 95)
+
+    Returns:
+        tuple: (start_threshold, end_threshold)
+
+    Raises:
+        ValueError: If configuration not found
+    """
+    try:
+        threshold_dict = UNIFORM_THRESHOLDS[percentile]
         model_config = threshold_dict[model_code]
         dataset_config = model_config[dataset]
         score_config = dataset_config[score_function]
@@ -1370,18 +1469,18 @@ def drift_filtering_uniform(
         # Handle the empty case - return empty array or default behavior
         self_scores = np.array([])  # or whatever makes sense for your use case
 
-    thresh = get_thresholds_window(
+    thresh = get_thresholds_uniform(
         args.eval_model_code, args.eval_dataset, args.score_function
     )
 
     self_mask = diff_scores_mask(self_scores, threshold=thresh)
 
     # Optionally, save the self-similarity scores to a file
-    # save_outputs(
-    #     self_similarity_scores,
-    #     args.log_name,
-    #     f"sample_{iter_idx}_self_similarity_scores_uniform",
-    # )
+    save_outputs(
+        self_similarity_scores,
+        args.log_name,
+        f"sample_{iter_idx}_self_similarity_scores_uniform",
+    )
     topk_contents = contents
     topk_contents = [t for t, m in zip(topk_contents, self_mask) if m]
     return topk_contents, self_scores

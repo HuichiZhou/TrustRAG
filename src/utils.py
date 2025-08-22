@@ -393,9 +393,6 @@ def get_tokenized_sentence_uniform(tokenized, num_tokens_to_remove):
     # ensure num_tokens_to_remove is int
     num_tokens_to_remove = int(num_tokens_to_remove)
     if valid_token_count - 2 <= num_tokens_to_remove:
-        print(
-            f"Valid token count {valid_token_count} is less than the number of indexes {num_tokens_to_remove} to truncate.\nReturning original input."
-        )
         return tensors
 
     # Choose positions evenly across the sequence excluding the first/last token
