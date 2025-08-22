@@ -74,6 +74,8 @@
             // "justMyCode": false,
             "args": [
                 // "--delete_incomplete"
+                "--drift_apq5_only",
+                "--perplexity_aware"
             ]
         },
         {

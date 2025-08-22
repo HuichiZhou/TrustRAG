@@ -12,6 +12,7 @@ REMOVAL_METHODS = [
     "drift",
     "perplexity",
     "drift_perplexity",
+    # "drift_uniform",
 ]  #     "kmeans_ngram", "drift", "drift_kmeans_ngram", "perplexity",
 
 REMOVAL_COLORS = dict(
@@ -110,11 +111,11 @@ def check_log_completion(file_path):
     Returns True if complete, False if incomplete.
     """
     required_patterns = [
-        r"Success injection rate in top 5 contents: \d+\.\d+%",
-        # r"Total run time for inference, removal and defense: \d+\.\d+",
-        # r"Correct Answer Percentage: \d+\.\d+%",
-        # r"Incorrect Answer Percentage: \d+\.\d+%",
-        # r"Total run time for inference, removal and defense: \d+\.\d+",
+        # r"Success injection rate in top 5 contents: \d+\.\d+%",
+        r"Total run time for inference, removal and defense: \d+\.\d+",
+        r"Correct Answer Percentage: \d+\.\d+%",
+        r"Incorrect Answer Percentage: \d+\.\d+%",
+        r"Total run time for inference, removal and defense: \d+\.\d+",
     ]
 
     try:
@@ -675,7 +676,12 @@ class ExperimentAnalyzer:
         plt.tight_layout()
 
         # Save combined plot
-        filename = f"dataset_combined_{attack}_attack_{score_func}_score_{num_tokens}_num_tokens.png"
+        if getattr(self, "perplexity_aware", None):
+            lambda_arg = "_perplexity_aware"
+        else:
+            lambda_arg = ""
+        filename = f"dataset_combined_{attack}_attack_{score_func}_score_{num_tokens}_num_tokens{lambda_arg}.png"
+
         filepath = os.path.join(self.output_dir, filename)
 
         try:
@@ -780,6 +786,9 @@ class ExperimentAnalyzer:
             mask = (filtered_data["removal"] == "drift") & (
                 filtered_data["adv_per_query"] != 5
             )
+            filtered_data = filtered_data[~mask]
+        if getattr(self, "perplexity_aware", False):
+            mask = filtered_data["lambda_ppl"] != 0
             filtered_data = filtered_data[~mask]
         if filtered_data.empty:
             print(
