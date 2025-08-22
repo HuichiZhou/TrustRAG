@@ -73,6 +73,8 @@ def parse_log_file(file_path):
                 match = re.search(pattern, experiment_name)
                 if key in ["no_questions", "both_sides"]:
                     data[key] = 1 if match else 0
+                elif key in ["lambda_ppl"]:
+                    data[key] = float(match.group(1)) if match else 0
                 else:
                     data[key] = match.group(1) if match else None
         else:
@@ -310,6 +312,10 @@ class ExperimentAnalyzer:
             # Only filter for drift removal
             mask = (data["removal"] == "drift") & (data["adv_per_query"] != 5)
             data = data[~mask]
+        if getattr(self, "perplexity_aware", False):
+            mask = data["lambda_ppl"] != 0
+            data = data[~mask]
+
         # Sort data
         sort_keys = ["adv_per_query", "score", "dataset", "model", "adv_a_position"]
         if self.has_retriever:
@@ -927,12 +933,15 @@ class ExperimentAnalyzer:
                             attack,
                             score_func,
                             datasets,
-                            num_tokens,
+                            int(num_tokens),
                         )
 
 
 def analyze_and_visualize(
-    df: pd.DataFrame, output_dir: str = "plots", drift_apq5_only=False
+    df: pd.DataFrame,
+    output_dir: str = "plots",
+    drift_apq5_only=False,
+    perplexity_aware=False,
 ):
     """
     Main function to analyze and visualize experiment data.
@@ -943,6 +952,7 @@ def analyze_and_visualize(
     """
     analyzer = ExperimentAnalyzer(df, output_dir)
     analyzer.drift_apq5_only = drift_apq5_only
+    analyzer.perplexity_aware = perplexity_aware
     analyzer.run_complete_analysis()
     return analyzer.df
 
@@ -972,6 +982,11 @@ def main():
         "--drift_apq5_only",
         action="store_true",
         help="For drift removal, only use data with adv_per_query == 5.",
+    )
+    parser.add_argument(
+        "--perplexity_aware",
+        action="store_true",
+        help="look only at perplexity aware attacks",
     )
     args = parser.parse_args()
 
@@ -1021,7 +1036,12 @@ def main():
     df = clean_and_convert_data(df)
 
     # Pass the plot directory to the analysis function
-    analyze_and_visualize(df, output_dir="plots", drift_apq5_only=args.drift_apq5_only)
+    analyze_and_visualize(
+        df,
+        output_dir="plots",
+        drift_apq5_only=args.drift_apq5_only,
+        perplexity_aware=args.perplexity_aware,
+    )
 
 
 if __name__ == "__main__":
