@@ -111,11 +111,11 @@ def check_log_completion(file_path):
     Returns True if complete, False if incomplete.
     """
     required_patterns = [
-        # r"Success injection rate in top 5 contents: \d+\.\d+%",
-        r"Total run time for inference, removal and defense: \d+\.\d+",
-        r"Correct Answer Percentage: \d+\.\d+%",
-        r"Incorrect Answer Percentage: \d+\.\d+%",
-        r"Total run time for inference, removal and defense: \d+\.\d+",
+        r"Success injection rate in top 5 contents: \d+\.\d+%",
+        # r"Total run time for inference, removal and defense: \d+\.\d+",
+        # r"Correct Answer Percentage: \d+\.\d+%",
+        # r"Incorrect Answer Percentage: \d+\.\d+%",
+        # r"Total run time for inference, removal and defense: \d+\.\d+",
     ]
 
     try:
@@ -313,8 +313,10 @@ class ExperimentAnalyzer:
             # Only filter for drift removal
             mask = (data["removal"] == "drift") & (data["adv_per_query"] != 5)
             data = data[~mask]
+        mask = data["lambda_ppl"] != 0
         if getattr(self, "perplexity_aware", False):
-            mask = data["lambda_ppl"] != 0
+            data = data[mask]
+        else:
             data = data[~mask]
 
         # Sort data
@@ -787,8 +789,10 @@ class ExperimentAnalyzer:
                 filtered_data["adv_per_query"] != 5
             )
             filtered_data = filtered_data[~mask]
+        mask = filtered_data["lambda_ppl"] != 0
         if getattr(self, "perplexity_aware", False):
-            mask = filtered_data["lambda_ppl"] != 0
+            filtered_data = filtered_data[mask]
+        else:
             filtered_data = filtered_data[~mask]
         if filtered_data.empty:
             print(
