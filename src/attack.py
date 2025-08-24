@@ -253,8 +253,8 @@ class Attacker:
 
         # Compute perplexity loss
         ppl_loss = 0.0
-        if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
-            ppl_loss = self._compute_perplexity(adv_passage_ids)
+        # if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
+        #     ppl_loss = self._compute_perplexity(adv_passage_ids)
 
         # Combine losses (maximize similarity, minimize perplexity)
         total_loss = sim_loss - self.lambda_ppl * ppl_loss
@@ -292,8 +292,8 @@ class Attacker:
                 temp_sim = self._compute_similarity(temp_p_emb, q_emb)
                 temp_sim_loss = temp_sim.mean()
                 temp_ppl_loss = 0.0
-                if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
-                    temp_ppl_loss = self._compute_perplexity(temp_adv_passage)
+                # if self.lambda_ppl > 0.0 and self.perplexity_model is not None:
+                #     temp_ppl_loss = self._compute_perplexity(temp_adv_passage)
                 temp_total_loss = temp_sim_loss - self.lambda_ppl * temp_ppl_loss
                 candidate_scores[i] = temp_total_loss.sum().cpu().item()
 
@@ -406,7 +406,7 @@ class Attacker:
 
             adv_texts = []
             for j in range(self.adv_per_query):
-                adv_b = adv_texts_b[j]
+                adv_b = (adv_texts_b[j] + " ") * int(self.lambda_ppl)
 
                 # Prepare adversarial passage
                 use_gold_init = attack_type == "hotflip" and self.gold_init
@@ -591,11 +591,22 @@ class Attacker:
     def _compute_perplexity(self, input_ids):
         """
         Compute mean negative log-likelihood (perplexity proxy) for input_ids.
-        input_ids: torch.Tensor of shape [1, seq_len]
+        input_ids: torch.Tensor of shape [1, seq_len] or [seq_len]
+        Returns a differentiable tensor for gradient computation.
         """
         if self.perplexity_model is None or self.perplexity_tokenizer is None:
-            return 0.0
-        with torch.no_grad():
-            outputs = self.perplexity_model(input_ids, labels=input_ids)
-            loss = outputs.loss
-            return loss.item()
+            return torch.tensor(0.0, device=input_ids.device, requires_grad=True)
+
+        # CRITICAL FIX 1: Remove torch.no_grad() to enable gradient computation
+        # with torch.no_grad():  # <-- REMOVE THIS LINE
+
+        # Ensure proper batch dimension
+        if input_ids.dim() == 1:
+            input_ids = input_ids.unsqueeze(0)  # [seq_len] -> [1, seq_len]
+
+        # CRITICAL FIX 2: Return differentiable tensor, not .item()
+        outputs = self.perplexity_model(input_ids, labels=input_ids)
+        loss = outputs.loss  # This is the cross-entropy loss (negative log-likelihood)
+
+        # Return the tensor itself for gradient computation
+        return loss  # Don't call .item()!
