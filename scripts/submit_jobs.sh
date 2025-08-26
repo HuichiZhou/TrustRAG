@@ -9,7 +9,7 @@ removals=('kmeans_ngram') # 'none' 'drift' 'kmeans' 'kmeans_ngram' 'all' 'drift_
 defenses=('none') # 'none' 'conflict' 'astute' 'instruct'
 scores=('dot') # 'dot' 'cos_sim'
 positions=('start' 'end') # 'start' 'end'
-advs_per_query=(5)
+advs_per_query=(1 3 5)
 num_tokens_to_remove=(30) # 0 5 10 15 20 25 30 35 40 45 50 55 56
 lambdas=(10)
 
