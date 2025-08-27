@@ -105,6 +105,18 @@ def parse_log_file(file_path):
     return data
 
 
+# Add this function to your ExperimentAnalyzer class
+def get_display_name(removal_method):
+    """Convert removal method names to display names for legends."""
+    display_names = {
+        "drift_perplexity": "Drift Perplexity",
+        "kmeans_ngram": "TrustRAG",
+        "drift": "Drift",
+        "perplexity": "Perplexity",
+    }
+    return display_names.get(removal_method, removal_method.replace("_", " ").title())
+
+
 def check_log_completion(file_path):
     """
     Check if a log file has the required completion pattern at the end.
@@ -365,7 +377,11 @@ class ExperimentAnalyzer:
                 data=data,
                 palette=palette,
             )
-            plt.legend(title="Removal Method")
+            legend_labels = [
+                get_display_name(method) for method in data["removal"].unique()
+            ]
+            handles, _ = plt.gca().get_legend_handles_labels()
+            plt.legend(handles, legend_labels, title="Removal Method")
         else:
             # Single method plot
             color = self._get_single_color(plot_type, is_f1_score)
@@ -672,9 +688,11 @@ class ExperimentAnalyzer:
             fontweight="bold",
         )
 
+        legend_labels = [get_display_name(method) for method in REMOVAL_METHODS]
         fig.legend(
+            legend_labels,
             loc="upper left",
-            bbox_to_anchor=(0.02, 0.98),
+            bbox_to_anchor=(0.02, 0.95),
             ncol=3,
             frameon=True,
             fancybox=True,
@@ -877,7 +895,7 @@ class ExperimentAnalyzer:
                                 x + (i - len(REMOVAL_METHODS) // 2) * width,
                                 scores_dict[method],
                                 width,
-                                label=method.replace("_", " ").title(),
+                                label=get_display_name(method),
                                 color=colors.get(method, "gray"),
                                 alpha=0.8,
                             )
