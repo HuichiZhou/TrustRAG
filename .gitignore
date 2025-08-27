@@ -184,3 +184,4 @@ results/beir_results/msmarco-*
 analysis_output/
 *.csv
 a_plots/
+plots/
