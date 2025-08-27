@@ -177,11 +177,9 @@ cython_debug/
 datasets/
 data_cache/
 logs/
-old_logs/
-old_plots/
 results/beir_results/msmarco-*
 
 analysis_output/
 *.csv
-a_plots/
 plots/
+.vscode/
