@@ -672,10 +672,17 @@ class ExperimentAnalyzer:
             fontweight="bold",
         )
 
-        # Create a single legend for the entire figure
-        fig.legend(loc="upper left", bbox_to_anchor=(0.5, 0.95), ncol=3)
+        fig.legend(
+            loc="upper left",
+            bbox_to_anchor=(0.02, 0.98),
+            ncol=3,
+            frameon=True,
+            fancybox=True,
+            shadow=True,
+        )
 
-        plt.tight_layout()
+        # Adjust layout to make room for legend
+        plt.tight_layout(rect=[0, 0, 1, 0.92])  # Leave space at top for legend
 
         # Save combined plot
         if getattr(self, "perplexity_aware", None):
