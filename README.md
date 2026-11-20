@@ -39,6 +39,8 @@ cd TrustRAG
 python run.py
 ```
 
+Optional: [RAGDefender](https://github.com/SecAI-Lab/RAGDefender) (ACSAC 2025) can be used as the passage removal step instead of k-means (`pip install ragdefender`, then `--removal_method ragdefender` or `'removal_method': 'ragdefender'` in **run.py**).
+
 ## 🙏 Acknowledgement
 
 * Our code used the implementation of [corpus-poisoning](https://github.com/princeton-nlp/corpus-poisoning).

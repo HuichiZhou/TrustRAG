@@ -65,7 +65,7 @@ test_params = {
     'gpu_id': 0,
     'attack_method': 'LM_targeted', # ['none', 'LM_targeted', 'hotflip', 'pia']
     'defend_method': 'conflict', # ['none', 'conflict', 'astute', 'instruct']
-    'removal_method': 'none', # ['kmeans', 'kmeans_ngram', 'none']
+    'removal_method': 'none', # ['kmeans', 'kmeans_ngram', 'ragdefender', 'none']
     'adv_per_query': 3, # poison rate = adv_per_query / top_k
     'score_function': 'dot',
     'repeat_times': 10,
