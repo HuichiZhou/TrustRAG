@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--M', type=int, default=10, help='one of our parameters, the number of target queries')
     parser.add_argument('--seed', type=int, default=12, help='Random seed')
     parser.add_argument("--log_name", type=str, help="Name of log and result.")
-    parser.add_argument("--removal_method", type=str, default='kmeans_ngram', choices=['kmeans', 'kmeans_ngram', 'none'])
+    parser.add_argument("--removal_method", type=str, default='kmeans_ngram', choices=['kmeans', 'kmeans_ngram', 'ragdefender', 'none'])
     parser.add_argument("--defend_method", type=str, default='conflict', choices=['none', 'conflict', 'astute', 'instruct'])
     args = parser.parse_args()
     logger.info(args)
@@ -58,6 +58,12 @@ def main():
     embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
     embedding_model = AutoModel.from_pretrained(embedding_model_name).cuda()
     embedding_model.eval()
+
+    ragdefender = None
+    if args.removal_method == 'ragdefender':
+        # pip install ragdefender  (https://github.com/SecAI-Lab/RAGDefender)
+        from ragdefender import RAGDefender
+        ragdefender = RAGDefender(task_type='multi_hop' if args.eval_dataset == 'hotpotqa' else 'single_hop', gpu_id=args.gpu_id)
 
     # load target queries and answers
     if args.eval_dataset == 'msmarco':
@@ -180,6 +186,9 @@ def main():
                     embedding_topk = [list(get_sentence_embedding(sentence, embedding_tokenizer, embedding_model).cpu().numpy()[0]) for sentence in topk_contents]
                     embedding_topk=np.array(embedding_topk)
                     embedding_topk, topk_contents = k_mean_filtering(embedding_topk,topk_contents, adv_text_set, "ngram" in args.removal_method)
+                elif args.removal_method == 'ragdefender' and args.top_k!=1:
+                    logger.info("Using removal method: ragdefender")
+                    topk_contents = ragdefender.defend(question, topk_contents)
                 else:
                     logger.info("Using no removal method")
           
